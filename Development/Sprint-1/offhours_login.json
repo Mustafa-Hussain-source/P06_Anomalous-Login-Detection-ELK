@@ -1,0 +1,10 @@
+{
+  "description": "Extract hour-of-day from @timestamp",
+  "processors": [
+    {
+      "script": {
+        "source": "if (ctx.containsKey('@timestamp') && ctx['@timestamp'] != null) { def t = Instant.parse(ctx['@timestamp']); def z = ZonedDateTime.ofInstant(t, ZoneId.of('Asia/Karachi')); ctx.logon_hour = z.getHour(); }"
+      }
+    }
+  ]
+}
