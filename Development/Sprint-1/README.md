@@ -1,27 +1,72 @@
-# Welcome to Winlogbeat 9.1.5
+# Anomalous Login Detection via ELK Stack  
+### Group Number: P06
 
-Winlogbeat ships Windows event logs to Elasticsearch or Logstash.
+![Status](https://img.shields.io/badge/Status-Completed-brightgreen)
+![ELK](https://img.shields.io/badge/ELK%20Stack-Elastic%2FLogstash%2FKibana-blue)
+![Security](https://img.shields.io/badge/Category-Cybersecurity-red)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
-## Getting Started
+---
 
-To get started with Winlogbeat, you need to set up Elasticsearch on
-your localhost first. After that, start Winlogbeat with:
+## Project Overview
+This project focuses on building an Anomalous Login Detection System using the ELK Stack (Elasticsearch, Logstash, Kibana).  
+The system centralizes authentication logs from Windows and Linux environments and applies correlation rules to identify login-based security threats, including:
 
-     ./winlogbeat -c winlogbeat.yml -e
+- Suspicious logins outside normal working hours  
+- Impossible travel events  
+- Brute-force attempts  
+- Privileged account misuse  
+- Kerberos/NTLM anomalies  
+- Linux SSH authentication anomalies  
 
-This will start Winlogbeat and send the data to your Elasticsearch
-instance. To load the dashboards for Winlogbeat into Kibana, run:
+The system provides SIEM-style visibility through Kibana dashboards and alerting mechanisms.
 
-    ./winlogbeat setup -e
+---
 
-For further steps visit the
-[Quick start](https://www.elastic.co/guide/en/beats/winlogbeat/9.1/winlogbeat-installation-configuration.html) guide.
+## Objectives
+- Deploy and configure a complete ELK pipeline  
+- Collect and process authentication logs from Windows and Linux hosts  
+- Implement detection rules for anomalous login behaviors  
+- Build dashboards and alerting workflows in Kibana  
+- Enhance visibility into identity-related threats  
 
-## Documentation
+---
 
-Visit [Elastic.co Docs](https://www.elastic.co/guide/en/beats/winlogbeat/9.1/index.html)
-for the full Winlogbeat documentation.
+## Completed Use Cases
+The following use cases were developed and completed during the project:
 
-## Release notes
+### UC-001: Collect Winlogon/NTLM/Kerberos Events from Windows Endpoints
+- Forwarded Windows Security Logs using Winlogbeat  
+- Parsed authentication events using Logstash pipelines  
 
-https://www.elastic.co/guide/en/beats/libbeat/9.1/release-notes-9.1.5.html
+### UC-002: Ingest Linux SSH Authentication Logs
+- Collected SSH authentication logs (`/var/log/auth.log` or `secure`)  
+- Standardized fields for cross-platform correlation  
+
+### UC-003: Detect Brute Force Attempts
+- Correlation rules for repeated failed logins in a short timeframe  
+- Dashboard visualizing offending users and IP addresses  
+
+### UC-004: Detect Impossible Travel
+- Implemented GeoIP enrichment  
+- Detected logins originating from distant geographic locations within unrealistic time windows  
+
+### UC-005: Off-Hours Login Detection
+- Developed baselines for user working hours  
+- Alerts triggered for off-hours authentication events  
+
+### UC-007: Privileged Account Watch
+- Monitored logins by privileged or administrative accounts  
+- Added detection logic for high-risk account usage  
+
+---
+
+## System Architecture
+
+```text
+Windows Endpoints → Winlogbeat → Logstash → Elasticsearch
+Linux Endpoints   → Filebeat    → Logstash → Elasticsearch
+                                     ↓
+                                   Kibana
+                              (Dashboards and Alerts)
+
