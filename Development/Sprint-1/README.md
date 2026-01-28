@@ -70,3 +70,4 @@ Linux Endpoints   → Filebeat    → Logstash → Elasticsearch
                                    Kibana
                               (Dashboards and Alerts)
 
+Minor update
