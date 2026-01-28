@@ -53,7 +53,7 @@ def first_value(src, *paths):
 
 def main():
     url = f"{ES_URL}/{ALERT_INDEX}/_search"
-    r = requests.post(url, auth=(ES_USER, ES_PASS), json=QUERY, timeout=60, verify=False)
+    r = requests.post(url, auth=(ES_USER, ES_PASS), json=QUERY, timeout=60)
     r.raise_for_status()
     hits = r.json().get("hits", {}).get("hits", [])
 
