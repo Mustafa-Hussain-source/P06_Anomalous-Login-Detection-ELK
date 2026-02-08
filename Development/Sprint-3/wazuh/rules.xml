@@ -1,0 +1,25 @@
+<group name="alds_sprint3">
+  <rule id="100101" level="10">
+    <if_sid>0</if_sid>
+    <field name="event_action">login_failure</field>
+    <description>UC-012 Brute Force Detected</description>
+  </rule>
+
+  <rule id="100102" level="8">
+    <if_sid>0</if_sid>
+    <field name="country">RU|CN|KP</field>
+    <description>UC-013 Geofencing Violation</description>
+  </rule>
+
+  <rule id="100103" level="7">
+    <if_sid>0</if_sid>
+    <field name="event_action">device_fingerprint_change</field>
+    <description>UC-014 Device Fingerprint Change</description>
+  </rule>
+
+  <rule id="100104" level="9">
+    <if_sid>0</if_sid>
+    <field name="impossible_travel">true</field>
+    <description>UC-015 Impossible Travel</description>
+  </rule>
+</group>
