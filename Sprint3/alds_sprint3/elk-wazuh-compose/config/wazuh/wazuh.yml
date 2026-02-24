@@ -1,0 +1,34 @@
+cluster_name: "wazuh-cluster"
+node_name: "wazuh-manager"
+manager:
+  address: "0.0.0.0"
+  port: 55000
+  protocol: "tcp"
+  api:
+    enabled: true
+    port: 55000
+    protocol: "tcp"
+  alerts:
+    enabled: true
+    log: true
+    email: false
+    slack: false
+    webhook: false
+  log:
+    level: "info"
+    file: "/var/ossec/logs/ossec.log"
+  integration:
+    elasticsearch:
+      enabled: true
+      host: "elasticsearch"
+      port: 9200
+      index: "wazuh-alerts-*"
+      username: "elastic"
+      password: "changeme"
+  agent:
+    enabled: true
+    auto_register: true
+    auto_register_key: "your_auto_register_key"
+    max_agents: 1000
+    agent_timeout: 60
+    agent_group: "default"
