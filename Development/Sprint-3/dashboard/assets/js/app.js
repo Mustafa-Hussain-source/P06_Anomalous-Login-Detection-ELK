@@ -4,6 +4,10 @@ const statusEl = document.getElementById("control-status");
 const eventsBody = document.getElementById("events-body");
 const mitigationsBody = document.getElementById("mitigations-body");
 
+let lastEventsSignature = "";
+let lastMitigationsSignature = "";
+let pollInFlight = false;
+
 async function triggerSimulation(endpoint, label) {
   statusEl.textContent = `Running ${label}...`;
   try {
@@ -62,7 +66,17 @@ function renderMitigations(items) {
   });
 }
 
+function buildSignature(items, fields) {
+  return items
+    .map((item) => fields.map((field) => item[field]).join("|"))
+    .join("~");
+}
+
 async function poll() {
+  if (pollInFlight) {
+    return;
+  }
+  pollInFlight = true;
   try {
     const [eventsRes, mitigationsRes] = await Promise.all([
       fetch(`${API_BASE}/events?limit=25`),
@@ -71,19 +85,29 @@ async function poll() {
 
     if (eventsRes.ok) {
       const events = await eventsRes.json();
-      renderEvents(events);
+      const eventsSignature = buildSignature(events, ["id", "timestamp", "risk_score", "event_action"]);
+      if (eventsSignature !== lastEventsSignature) {
+        renderEvents(events);
+        lastEventsSignature = eventsSignature;
+      }
     }
 
     if (mitigationsRes.ok) {
       const mitigations = await mitigationsRes.json();
-      renderMitigations(mitigations);
+      const mitigationsSignature = buildSignature(mitigations, ["id", "timestamp", "status", "action"]);
+      if (mitigationsSignature !== lastMitigationsSignature) {
+        renderMitigations(mitigations);
+        lastMitigationsSignature = mitigationsSignature;
+      }
     }
   } catch (err) {
     statusEl.textContent = "API unreachable";
+  } finally {
+    pollInFlight = false;
   }
 }
 
-setInterval(poll, 500);
+setInterval(poll, 2000);
 
 poll();
 

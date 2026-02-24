@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import math
+import os
 import random
 import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal, engine, get_db
-from .models import ActiveSession, Base, LoginEvent, MitigationLog, User
+from .models import ActiveSession, Base, IpBlacklist, LoginEvent, MitigationLog, User
 from .seed import build_seed_payloads
 from .simulator import simulate_uc_012, simulate_uc_013, simulate_uc_014, simulate_uc_015
 
@@ -45,6 +48,149 @@ class LoginResponse(BaseModel):
 
 RUSSIAN_THREAT_ACTOR = "Russian Threat Actor"
 MALICIOUS_ENTITY = "Malicious Entity"
+WAZUH_ALERT_PATH = Path(
+    os.getenv(
+        "ALDS_WAZUH_ALERTS_PATH",
+        str(Path(__file__).resolve().parents[1] / "wazuh" / "alerts" / "alerts.json"),
+    )
+)
+
+
+def _append_wazuh_alert(alert: dict) -> None:
+    WAZUH_ALERT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with WAZUH_ALERT_PATH.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(alert, ensure_ascii=False) + "\n")
+
+
+def _record_mitigation(
+    db: Session,
+    uc_id: str,
+    target_identifier: str,
+    action: str,
+    status: str = "blocked",
+) -> None:
+    if uc_id == "UC-012" and action == "account_lock":
+        existing = (
+            db.query(MitigationLog)
+            .filter(
+                MitigationLog.uc_id == uc_id,
+                MitigationLog.target_identifier == target_identifier,
+                MitigationLog.action == action,
+                MitigationLog.status == "blocked",
+            )
+            .order_by(MitigationLog.id.desc())
+            .first()
+        )
+        if existing:
+            return
+
+    db.add(
+        MitigationLog(
+            uc_id=uc_id,
+            target_identifier=target_identifier,
+            action=action,
+            status="blocked",
+            timestamp=datetime.now().astimezone(),
+        )
+    )
+
+
+def _emit_security_alert(
+    login_event: LoginEvent,
+    user_id: int,
+    mitigation_action: str | None,
+    mitigation_status: str | None,
+) -> None:
+    rule_map = {
+        "login_failure": (100012, "UC-012 Brute Force Attempt"),
+        "blocked_malicious_actor": (100012, "UC-012 Malicious Actor Blocked"),
+        "account_locked_block": (100012, "UC-012 Account Locked"),
+        "geofence_violation": (100013, "UC-013 Geofence Violation"),
+        "ip_blacklist_block": (100013, "UC-013 Blacklisted IP Blocked"),
+        "device_fingerprint_change": (100014, "UC-014 Session Hijack Attempt"),
+        "impossible_travel": (100015, "UC-015 Impossible Travel"),
+        "mfa_challenge_required": (100015, "UC-015 MFA Challenge Required"),
+    }
+    rule_id, description = rule_map.get(
+        login_event.event_action,
+        (100000, "ALDS Suspicious Login Event"),
+    )
+
+    alert = {
+        "rule": {
+            "id": rule_id,
+            "description": description,
+        },
+        "username": login_event.username,
+        "srcip": login_event.ip_address,
+        "event_action": login_event.event_action,
+        "risk_score": login_event.risk_score,
+        "country": login_event.country,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "data": {
+            "user_id": user_id,
+            "event_id": login_event.id,
+            "mitigation_action": mitigation_action,
+            "mitigation_status": mitigation_status,
+        },
+    }
+    _append_wazuh_alert(alert)
+
+
+def _apply_mitigation(db: Session, user: User, login_event: LoginEvent) -> tuple[str | None, str | None]:
+    mitigation_action = None
+    mitigation_status = None
+
+    if login_event.event_action == "geofence_violation":
+        existing_ip = (
+            db.query(IpBlacklist)
+            .filter(IpBlacklist.ip_address == login_event.ip_address)
+            .one_or_none()
+        )
+        if not existing_ip:
+            db.add(
+                IpBlacklist(
+                    ip_address=login_event.ip_address,
+                    reason="UC-013 geofencing",
+                    timestamp=datetime.now().astimezone(),
+                )
+            )
+        _record_mitigation(db, "UC-013", login_event.ip_address, "ip_block")
+        mitigation_action = "ip_block"
+        mitigation_status = "blocked"
+
+    elif login_event.event_action == "device_fingerprint_change":
+        db.query(ActiveSession).filter(ActiveSession.user_id == user.id).delete()
+        _record_mitigation(db, "UC-014", login_event.username, "session_kill")
+        mitigation_action = "session_kill"
+        mitigation_status = "blocked"
+
+    elif login_event.event_action == "impossible_travel":
+        user.mfa_required = True
+        _record_mitigation(db, "UC-015", login_event.username, "mfa_stepup")
+        mitigation_action = "mfa_stepup"
+        mitigation_status = "blocked"
+
+    elif login_event.event_action in {"login_failure", "blocked_malicious_actor"}:
+        recent_failures = (
+            db.query(LoginEvent)
+            .filter(
+                LoginEvent.username == login_event.username,
+                LoginEvent.event_action.in_(["login_failure", "blocked_malicious_actor"]),
+            )
+            .order_by(LoginEvent.id.desc())
+            .limit(5)
+            .all()
+        )
+        if len(recent_failures) >= 5:
+            user.is_locked = True
+            _record_mitigation(db, "UC-012", login_event.username, "account_lock")
+            mitigation_action = "account_lock"
+            mitigation_status = "blocked"
+
+    if mitigation_action:
+        db.commit()
+    return mitigation_action, mitigation_status
 
 
 def _hash_password(password: str) -> str:
@@ -245,7 +391,72 @@ def login(
         db.commit()
         db.refresh(user)
 
+    client_ip = x_forwarded_for or "127.0.0.1"
+    client_country = x_country or "PK"
+
+    blacklisted_ip = (
+        db.query(IpBlacklist)
+        .filter(IpBlacklist.ip_address == client_ip)
+        .one_or_none()
+    )
+    if blacklisted_ip:
+        blacklisted_event = LoginEvent(
+            username=username,
+            ip_address=client_ip,
+            user_agent=payload.user_agent,
+            country=client_country,
+            is_suspicious=True,
+            risk_score=95,
+            event_action="ip_blacklist_block",
+            device_fingerprint=payload.device_fingerprint,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            impossible_travel=False,
+            timestamp=datetime.now().astimezone(),
+        )
+        db.add(blacklisted_event)
+        db.commit()
+        db.refresh(blacklisted_event)
+
+        _record_mitigation(db, "UC-013", client_ip, "ip_block")
+        db.commit()
+
+        _emit_security_alert(
+            blacklisted_event,
+            user.id,
+            mitigation_action="ip_block",
+            mitigation_status="blocked",
+        )
+        raise HTTPException(status_code=403, detail="ip blacklisted")
+
     if user.is_locked:
+        locked_event = LoginEvent(
+            username=username,
+            ip_address=client_ip,
+            user_agent=payload.user_agent,
+            country=client_country,
+            is_suspicious=True,
+            risk_score=95,
+            event_action="account_locked_block",
+            device_fingerprint=payload.device_fingerprint,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            impossible_travel=False,
+            timestamp=datetime.now().astimezone(),
+        )
+        db.add(locked_event)
+        db.commit()
+        db.refresh(locked_event)
+
+        _record_mitigation(db, "UC-012", username, "account_lock")
+        db.commit()
+
+        _emit_security_alert(
+            locked_event,
+            user.id,
+            mitigation_action="account_lock",
+            mitigation_status="blocked",
+        )
         raise HTTPException(status_code=403, detail="account locked")
 
     if x_seed_session == "true" and payload.device_fingerprint:
@@ -264,7 +475,7 @@ def login(
     event_action = "login_success" if is_success else "login_failure"
     is_suspicious = not is_success
     risk_score = 80 if is_suspicious else 5
-    country = x_country or "PK"
+    country = client_country
 
     if is_success:
         if username == RUSSIAN_THREAT_ACTOR:
@@ -295,6 +506,12 @@ def login(
         if event_action == "login_success":
             event_action = "blocked_malicious_actor"
 
+    if is_success and user.mfa_required:
+        is_success = False
+        is_suspicious = True
+        risk_score = max(risk_score, 75)
+        event_action = "mfa_challenge_required"
+
     existing_session = (
         db.query(ActiveSession).filter(ActiveSession.user_id == user.id).first()
     )
@@ -315,7 +532,7 @@ def login(
         country = "RU"
         ip_address = x_forwarded_for or "5.255.255.1"
     else:
-        ip_address = x_forwarded_for or "127.0.0.1"
+        ip_address = client_ip
 
     login_event = LoginEvent(
         username=username,
@@ -333,9 +550,18 @@ def login(
     )
     db.add(login_event)
     db.commit()
+    db.refresh(login_event)
+
+    mitigation_action = None
+    mitigation_status = None
+    if is_suspicious:
+        mitigation_action, mitigation_status = _apply_mitigation(db, user, login_event)
+        _emit_security_alert(login_event, user.id, mitigation_action, mitigation_status)
 
     if event_action == "geofence_violation":
         return LoginResponse(success=False, message="geofence blocked")
+    if event_action == "mfa_challenge_required":
+        return LoginResponse(success=False, message="mfa required")
     return LoginResponse(success=is_success, message="ok" if is_success else "invalid credentials")
 
 
@@ -391,10 +617,11 @@ def list_mitigations(limit: int = 50, db: Session = Depends(get_db)):
 @app.post("/events/clear")
 def clear_events(seed: bool = True, db: Session = Depends(get_db)):
     db.query(LoginEvent).delete()
+    db.query(MitigationLog).delete()
     if seed:
         _seed_baseline_events(db)
     db.commit()
-    return {"status": "cleared", "seeded": seed}
+    return {"status": "cleared", "seeded": seed, "mitigations_cleared": True}
 
 
 @app.post("/traffic/start")

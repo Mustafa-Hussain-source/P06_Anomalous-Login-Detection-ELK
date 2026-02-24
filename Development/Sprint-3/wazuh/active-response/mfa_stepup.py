@@ -54,7 +54,7 @@ def main() -> int:
             INSERT INTO mitigation_log (uc_id, target_identifier, action, status, timestamp)
             VALUES (?, ?, ?, ?, ?)
             """,
-            ("UC-015", username, "mfa_stepup", "success", datetime.now()),
+            ("UC-015", username, "mfa_stepup", "success", datetime.now().isoformat()),
         )
         conn.commit()
         print(json.dumps({"status": "success", "action": "mfa_stepup", "username": username}))

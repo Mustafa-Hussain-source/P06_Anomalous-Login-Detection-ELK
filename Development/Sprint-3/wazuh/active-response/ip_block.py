@@ -50,14 +50,14 @@ def main() -> int:
     try:
         conn.execute(
             "INSERT OR IGNORE INTO ip_blacklist (ip_address, reason, timestamp) VALUES (?, ?, ?)",
-            (ip, "UC-013 geofencing", datetime.now()),
+            (ip, "UC-013 geofencing", datetime.now().isoformat()),
         )
         conn.execute(
             """
             INSERT INTO mitigation_log (uc_id, target_identifier, action, status, timestamp)
             VALUES (?, ?, ?, ?, ?)
             """,
-            ("UC-013", ip, "ip_block", "success", datetime.now()),
+            ("UC-013", ip, "ip_block", "success", datetime.now().isoformat()),
         )
         conn.commit()
         print(json.dumps({"status": "success", "action": "ip_block", "ip": ip}))

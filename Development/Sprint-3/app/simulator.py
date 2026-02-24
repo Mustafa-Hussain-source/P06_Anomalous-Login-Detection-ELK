@@ -42,6 +42,8 @@ def _post_login(
 
 MALICIOUS_USERNAME = "Malicious Entity"
 RUSSIAN_THREAT_ACTOR = "Russian Threat Actor"
+SESSION_HIJACK_TEST_USER = "Session Hijack Tester"
+IMPOSSIBLE_TRAVEL_TEST_USER = "Impossible Travel Tester"
 
 
 def simulate_uc_012(base_url: str, username: str | None = None) -> None:
@@ -58,7 +60,7 @@ def simulate_uc_013(base_url: str, username: str | None = None) -> None:
 
 
 def simulate_uc_014(base_url: str, username: str | None = None) -> None:
-    target = username or MALICIOUS_USERNAME
+    target = username or SESSION_HIJACK_TEST_USER
     _post_login(
         base_url,
         username=target,
@@ -76,7 +78,7 @@ def simulate_uc_014(base_url: str, username: str | None = None) -> None:
 
 
 def simulate_uc_015(base_url: str, username: str | None = None) -> None:
-    target = username or MALICIOUS_USERNAME
+    target = username or IMPOSSIBLE_TRAVEL_TEST_USER
     far_locations = [
         ("US", "23.45.67.88", 40.7128, -74.0060),
         ("JP", "103.21.90.88", 35.6895, 139.6917),

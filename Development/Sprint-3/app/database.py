@@ -21,7 +21,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 @event.listens_for(engine, "connect")
 def _set_sqlite_pragma(dbapi_connection, _connection_record) -> None:
     cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("PRAGMA journal_mode=DELETE;")
     cursor.execute("PRAGMA synchronous=NORMAL;")
     cursor.close()
 
