@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alds-api-config
+  namespace: alds
+data:
+  ALDS_WAZUH_ALERTS_PATH: /tmp/alerts.json

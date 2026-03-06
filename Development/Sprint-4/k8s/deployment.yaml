@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alds-api
+  namespace: alds
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alds-api
+  template:
+    metadata:
+      labels:
+        app: alds-api
+    spec:
+      containers:
+        - name: alds-api
+          image: alds-sprint3-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: alds-api-config
+          readinessProbe:
+            httpGet:
+              path: /docs
+              port: 8000
+            initialDelaySeconds: 8
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /docs
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 15

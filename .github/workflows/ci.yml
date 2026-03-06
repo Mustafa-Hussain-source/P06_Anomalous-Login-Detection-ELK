@@ -19,14 +19,27 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
+        working-directory: Development/Sprint-3
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Syntax check
+      - name: Syntax check Sprint-3 backend
+        working-directory: Development/Sprint-3
         run: |
           python -m compileall app
 
+      - name: Syntax check Sprint-4
+        working-directory: Development/Sprint-4
+        run: |
+          python -m compileall uc_automation.py test_uc_automation.py
+
+      - name: Run Sprint-4 tests
+        working-directory: Development/Sprint-4
+        run: |
+          python -m unittest -v test_uc_automation.py
+
       - name: Dependency check
+        working-directory: Development/Sprint-3
         run: |
           python -m pip check

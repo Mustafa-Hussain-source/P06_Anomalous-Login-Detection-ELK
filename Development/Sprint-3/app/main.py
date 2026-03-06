@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import math
 import os
 import random
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -39,6 +41,10 @@ class LoginRequest(BaseModel):
     device_fingerprint: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+    is_admin_console: bool = False
+    api_key_id: str | None = None
+    api_key_compromised: bool = False
+    containment_entity: str | None = None
 
 
 class LoginResponse(BaseModel):
@@ -54,6 +60,34 @@ WAZUH_ALERT_PATH = Path(
         str(Path(__file__).resolve().parents[1] / "wazuh" / "alerts" / "alerts.json"),
     )
 )
+
+SPRINT4_UC_AUTOMATION_PATH = Path(__file__).resolve().parents[2] / "Sprint-4" / "uc_automation.py"
+SPRINT4_EVIDENCE_PATH = (
+    Path(__file__).resolve().parents[2] / "Sprint-4" / "artifacts" / "runtime_mitigation_evidence.jsonl"
+)
+
+
+def _load_sprint4_engine():
+    if not SPRINT4_UC_AUTOMATION_PATH.exists():
+        return None
+
+    try:
+        module_name = "sprint4_uc_automation"
+        spec = importlib.util.spec_from_file_location(module_name, SPRINT4_UC_AUTOMATION_PATH)
+        if not spec or not spec.loader:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        engine_cls = getattr(module, "Sprint4AutomationEngine", None)
+        if engine_cls is None:
+            return None
+        return engine_cls(evidence_file=str(SPRINT4_EVIDENCE_PATH))
+    except Exception:
+        return None
+
+
+SPRINT4_ENGINE = _load_sprint4_engine()
 
 
 def _append_wazuh_alert(alert: dict) -> None:
@@ -89,10 +123,92 @@ def _record_mitigation(
             uc_id=uc_id,
             target_identifier=target_identifier,
             action=action,
-            status="blocked",
+            status=status,
             timestamp=datetime.now().astimezone(),
         )
     )
+
+
+def _apply_sprint4_runtime_mitigations(
+    db: Session,
+    payload: LoginRequest,
+    login_event: LoginEvent,
+) -> tuple[str | None, str | None]:
+    if SPRINT4_ENGINE is None:
+        return None, None
+
+    actions: list[str] = []
+    statuses: list[str] = []
+
+    if payload.api_key_compromised:
+        uc_016_result = SPRINT4_ENGINE.run_uc_action(
+            "UC-016",
+            {
+                "user_id": login_event.username,
+                "api_key_id": payload.api_key_id or "",
+                "compromised": payload.api_key_compromised,
+            },
+        )
+        if uc_016_result.status == "success":
+            _record_mitigation(
+                db,
+                "UC-016",
+                payload.api_key_id or login_event.username,
+                "api_key_revoke",
+                status="success",
+            )
+            actions.append(uc_016_result.action)
+            statuses.append(uc_016_result.status)
+
+    uc_018_result = SPRINT4_ENGINE.run_uc_action(
+        "UC-018",
+        {
+            "username": login_event.username,
+            "is_admin_console": payload.is_admin_console,
+            "risk_score": login_event.risk_score / 100.0,
+            "threshold": 0.85,
+        },
+    )
+    if uc_018_result.status == "success":
+        _record_mitigation(
+            db,
+            "UC-018",
+            login_event.username,
+            "admin_console_block",
+            status="success",
+        )
+        actions.append(uc_018_result.action)
+        statuses.append(uc_018_result.status)
+
+    if login_event.is_suspicious and login_event.risk_score >= 85:
+        uc_019_result = SPRINT4_ENGINE.run_uc_action(
+            "UC-019",
+            {
+                "entity": payload.containment_entity or login_event.username,
+                "severity": "high" if login_event.risk_score >= 90 else "medium",
+                "context": {
+                    "source": "sprint3_runtime",
+                    "event_action": login_event.event_action,
+                    "risk_score": login_event.risk_score,
+                    "ip_address": login_event.ip_address,
+                },
+            },
+        )
+        if uc_019_result.status == "success":
+            _record_mitigation(
+                db,
+                "UC-019",
+                payload.containment_entity or login_event.username,
+                "containment_ticket_create",
+                status="success",
+            )
+            actions.append(uc_019_result.action)
+            statuses.append(uc_019_result.status)
+
+    if actions:
+        db.commit()
+        return ",".join(actions), ",".join(statuses)
+    return None, None
 
 
 def _emit_security_alert(
@@ -556,6 +672,13 @@ def login(
     mitigation_status = None
     if is_suspicious:
         mitigation_action, mitigation_status = _apply_mitigation(db, user, login_event)
+        sprint4_action, sprint4_status = _apply_sprint4_runtime_mitigations(db, payload, login_event)
+
+        combined_actions = [value for value in [mitigation_action, sprint4_action] if value]
+        combined_statuses = [value for value in [mitigation_status, sprint4_status] if value]
+        mitigation_action = ",".join(combined_actions) if combined_actions else None
+        mitigation_status = ",".join(combined_statuses) if combined_statuses else None
+
         _emit_security_alert(login_event, user.id, mitigation_action, mitigation_status)
 
     if event_action == "geofence_violation":
