@@ -5,7 +5,7 @@ Close the Sprint-4 SonarQube requirement with verifiable CI evidence for changed
 
 ## Prerequisites
 - Repository secret `SONAR_TOKEN` is configured in GitHub Actions secrets.
-- `build.yml` workflow exists in `.github/workflows/`.
+- `ci-cd.yml` workflow exists in `.github/workflows/`.
 - `sonar-project.properties` is configured for Sprint-3/Sprint-4 code paths.
 
 ## What Gets Scanned
@@ -15,8 +15,8 @@ Close the Sprint-4 SonarQube requirement with verifiable CI evidence for changed
 ## Trigger a Sonar Scan
 1. Commit and push your current branch.
 2. Open GitHub Actions tab.
-3. Run workflow `Build` (or trigger by push to `main`).
-4. Confirm job `SonarQube` completes successfully.
+3. Run workflow `ci-cd` (or trigger by push to `main`/`master`).
+4. Confirm job `SonarQube Scan` completes successfully.
 
 ## Evidence to Capture
 - Screenshot of successful `SonarQube` job in Actions.
