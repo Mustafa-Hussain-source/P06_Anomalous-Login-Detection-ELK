@@ -19,7 +19,15 @@ from sqlalchemy.orm import Session
 from .database import SessionLocal, engine, get_db
 from .models import ActiveSession, Base, IpBlacklist, LoginEvent, MitigationLog, User
 from .seed import build_seed_payloads
-from .simulator import simulate_uc_012, simulate_uc_013, simulate_uc_014, simulate_uc_015
+from .simulator import (
+    simulate_uc_012,
+    simulate_uc_013,
+    simulate_uc_014,
+    simulate_uc_015,
+    simulate_uc_016,
+    simulate_uc_018,
+    simulate_uc_019,
+)
 
 Base.metadata.create_all(bind=engine)
 
@@ -789,3 +797,40 @@ def trigger_uc_014(background_tasks: BackgroundTasks):
 def trigger_uc_015(background_tasks: BackgroundTasks):
     background_tasks.add_task(simulate_uc_015, "http://localhost:8000")
     return {"status": "started", "uc": "UC-015"}
+
+
+@app.post("/simulate/uc-016")
+def trigger_uc_016(background_tasks: BackgroundTasks):
+    background_tasks.add_task(simulate_uc_016, "http://localhost:8000")
+    return {"status": "started", "uc": "UC-016"}
+
+
+@app.post("/simulate/uc-018")
+def trigger_uc_018(background_tasks: BackgroundTasks):
+    background_tasks.add_task(simulate_uc_018, "http://localhost:8000")
+    return {"status": "started", "uc": "UC-018"}
+
+
+@app.post("/simulate/uc-019")
+def trigger_uc_019(background_tasks: BackgroundTasks):
+    background_tasks.add_task(simulate_uc_019, "http://localhost:8000")
+    return {"status": "started", "uc": "UC-019"}
+
+
+@app.get("/sprint4/evidence")
+def list_sprint4_evidence(limit: int = 50):
+    if not SPRINT4_EVIDENCE_PATH.exists():
+        return []
+
+    lines = SPRINT4_EVIDENCE_PATH.read_text(encoding="utf-8").splitlines()
+    records: list[dict] = []
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            records.append(dict(json.loads(line)))
+        except json.JSONDecodeError:
+            continue
+        if len(records) >= max(limit, 1):
+            break
+    return records

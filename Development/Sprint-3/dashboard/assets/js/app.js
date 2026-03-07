@@ -3,9 +3,11 @@ const API_BASE = "http://localhost:8000";
 const statusEl = document.getElementById("control-status");
 const eventsBody = document.getElementById("events-body");
 const mitigationsBody = document.getElementById("mitigations-body");
+const sprint4EvidenceBody = document.getElementById("sprint4-evidence-body");
 
 let lastEventsSignature = "";
 let lastMitigationsSignature = "";
+let lastSprint4EvidenceSignature = "";
 let pollInFlight = false;
 
 async function triggerSimulation(endpoint, label) {
@@ -66,6 +68,23 @@ function renderMitigations(items) {
   });
 }
 
+function renderSprint4Evidence(items) {
+  sprint4EvidenceBody.innerHTML = "";
+  items.forEach((item) => {
+    const row = document.createElement("tr");
+    const details = item.details ? JSON.stringify(item.details) : "-";
+    row.innerHTML = `
+      <td class="py-2">${formatTime(item.timestamp)}</td>
+      <td>${item.uc_id ?? "-"}</td>
+      <td>${item.event ?? "-"}</td>
+      <td>${item.action ?? "-"}</td>
+      <td>${item.status ?? "-"}</td>
+      <td class="text-xs text-slate-300 break-all">${details}</td>
+    `;
+    sprint4EvidenceBody.appendChild(row);
+  });
+}
+
 function buildSignature(items, fields) {
   return items
     .map((item) => fields.map((field) => item[field]).join("|"))
@@ -78,9 +97,10 @@ async function poll() {
   }
   pollInFlight = true;
   try {
-    const [eventsRes, mitigationsRes] = await Promise.all([
+    const [eventsRes, mitigationsRes, sprint4Res] = await Promise.all([
       fetch(`${API_BASE}/events?limit=25`),
       fetch(`${API_BASE}/mitigations?limit=25`),
+      fetch(`${API_BASE}/sprint4/evidence?limit=25`),
     ]);
 
     if (eventsRes.ok) {
@@ -98,6 +118,15 @@ async function poll() {
       if (mitigationsSignature !== lastMitigationsSignature) {
         renderMitigations(mitigations);
         lastMitigationsSignature = mitigationsSignature;
+      }
+    }
+
+    if (sprint4Res && sprint4Res.ok) {
+      const evidenceItems = await sprint4Res.json();
+      const evidenceSignature = buildSignature(evidenceItems, ["timestamp", "uc_id", "event", "status"]);
+      if (evidenceSignature !== lastSprint4EvidenceSignature) {
+        renderSprint4Evidence(evidenceItems);
+        lastSprint4EvidenceSignature = evidenceSignature;
       }
     }
   } catch (err) {
@@ -127,8 +156,20 @@ document.getElementById("btn-uc-015").addEventListener("click", () => {
   triggerSimulation("/simulate/uc-015", "UC-015");
 });
 
+document.getElementById("btn-uc-016").addEventListener("click", () => {
+  triggerSimulation("/simulate/uc-016", "UC-016");
+});
+
+document.getElementById("btn-uc-018").addEventListener("click", () => {
+  triggerSimulation("/simulate/uc-018", "UC-018");
+});
+
+document.getElementById("btn-uc-019").addEventListener("click", () => {
+  triggerSimulation("/simulate/uc-019", "UC-019");
+});
+
 document.getElementById("btn-clear-events").addEventListener("click", async () => {
-  statusEl.textContent = "ResettingSimulation...";
+  statusEl.textContent = "Resetting simulation...";
   try {
     const res = await fetch(`${API_BASE}/events/clear?seed=true`, { method: "POST" });
     if (!res.ok) {
@@ -147,7 +188,7 @@ let trafficRunning = false;
 
 async function toggleTraffic() {
   const endpoint = trafficRunning ? "/traffic/stop" : "/traffic/start";
-  statusEl.textContent = trafficRunning ? "Stopping  Simulation..." : "StartingSimulation...";
+  statusEl.textContent = trafficRunning ? "Stopping simulation..." : "Starting simulation...";
   try {
     const res = await fetch(`${API_BASE}${endpoint}`, { method: "POST" });
     if (!res.ok) {

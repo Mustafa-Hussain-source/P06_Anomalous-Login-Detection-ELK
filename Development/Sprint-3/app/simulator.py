@@ -16,6 +16,10 @@ def _post_login(
     device_fingerprint: Optional[str] = None,
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
+    is_admin_console: bool = False,
+    api_key_id: Optional[str] = None,
+    api_key_compromised: bool = False,
+    containment_entity: Optional[str] = None,
     seed_session: bool = False,
 ):
     headers = {}
@@ -34,6 +38,10 @@ def _post_login(
             "device_fingerprint": device_fingerprint,
             "latitude": latitude,
             "longitude": longitude,
+            "is_admin_console": is_admin_console,
+            "api_key_id": api_key_id,
+            "api_key_compromised": api_key_compromised,
+            "containment_entity": containment_entity,
         },
         headers=headers,
         timeout=5,
@@ -44,6 +52,9 @@ MALICIOUS_USERNAME = "Malicious Entity"
 RUSSIAN_THREAT_ACTOR = "Russian Threat Actor"
 SESSION_HIJACK_TEST_USER = "Session Hijack Tester"
 IMPOSSIBLE_TRAVEL_TEST_USER = "Impossible Travel Tester"
+SPRINT4_API_KEY_USER = "Sprint4 API Key User"
+SPRINT4_ADMIN_USER = "Sprint4 Admin User"
+SPRINT4_CONTAINMENT_USER = "Sprint4 Containment User"
 
 
 def simulate_uc_012(base_url: str, username: str | None = None) -> None:
@@ -115,4 +126,35 @@ def simulate_uc_015(base_url: str, username: str | None = None) -> None:
         device_fingerprint="device-a",
         latitude=second[2],
         longitude=second[3],
+    )
+
+
+def simulate_uc_016(base_url: str, username: str | None = None) -> None:
+    target = username or SPRINT4_API_KEY_USER
+    _post_login(
+        base_url,
+        username=target,
+        password="wrong-password",
+        api_key_id="sim-key-016",
+        api_key_compromised=True,
+    )
+
+
+def simulate_uc_018(base_url: str, username: str | None = None) -> None:
+    target = username or SPRINT4_ADMIN_USER
+    _post_login(
+        base_url,
+        username=target,
+        password="wrong-password",
+        is_admin_console=True,
+    )
+
+
+def simulate_uc_019(base_url: str, username: str | None = None) -> None:
+    target = username or SPRINT4_CONTAINMENT_USER
+    _post_login(
+        base_url,
+        username=target,
+        password="wrong-password",
+        containment_entity="ip:185.93.50.10",
     )

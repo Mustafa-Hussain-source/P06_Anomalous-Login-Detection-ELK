@@ -10,8 +10,8 @@
     <div class="max-w-6xl mx-auto px-6 py-8">
       <header class="flex items-center justify-between mb-8">
         <div>
-          <h1 class="text-3xl font-bold">ALDS Sprint 3</h1>
-          <p class="text-slate-400">Anomalous Login Detection System</p>
+          <h1 class="text-3xl font-bold">ALDS Sprint 3 + Sprint 4</h1>
+          <p class="text-slate-400">Anomalous Login Detection and Automated Mitigation Console</p>
         </div>
         <div class="text-sm text-slate-400">Backend: http://localhost:8000</div>
       </header>
@@ -24,6 +24,9 @@
             <button id="btn-uc-013" class="w-full bg-rose-600 hover:bg-rose-500 text-white py-2 rounded">Run UC-013 (Geofencing)</button>
             <button id="btn-uc-014" class="w-full bg-sky-600 hover:bg-sky-500 text-white py-2 rounded">Run UC-014 (Session Hijack)</button>
             <button id="btn-uc-015" class="w-full bg-amber-600 hover:bg-amber-500 text-white py-2 rounded">Run UC-015 (Impossible Travel)</button>
+            <button id="btn-uc-016" class="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white py-2 rounded">Run UC-016 (API Key Revoke)</button>
+            <button id="btn-uc-018" class="w-full bg-cyan-700 hover:bg-cyan-600 text-white py-2 rounded">Run UC-018 (Admin Console Block)</button>
+            <button id="btn-uc-019" class="w-full bg-lime-700 hover:bg-lime-600 text-white py-2 rounded">Run UC-019 (Containment Ticket)</button>
             <button id="btn-traffic" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white py-2 rounded">Start Simulation</button>
             <button id="btn-clear-events" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded">Reset Simulation</button>
           </div>
@@ -64,6 +67,25 @@
               </tr>
             </thead>
             <tbody id="mitigations-body" class="divide-y divide-slate-800"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="bg-slate-900 rounded-xl p-5 shadow mt-6">
+        <h2 class="font-semibold mb-4">Sprint-4 Runtime Evidence</h2>
+        <div class="overflow-auto max-h-72">
+          <table class="w-full text-sm">
+            <thead class="text-slate-400 text-left">
+              <tr>
+                <th class="py-2">Time</th>
+                <th>UC</th>
+                <th>Event</th>
+                <th>Action</th>
+                <th>Status</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="sprint4-evidence-body" class="divide-y divide-slate-800"></tbody>
           </table>
         </div>
       </section>
