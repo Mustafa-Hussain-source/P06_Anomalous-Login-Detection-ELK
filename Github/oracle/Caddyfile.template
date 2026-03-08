@@ -1,0 +1,9 @@
+# Replace HOST_PLACEHOLDER with your public domain or IP.
+HOST_PLACEHOLDER {
+    root * /home/ubuntu/Github/P06_Anomalous-Login-Detection-ELK/Development/Sprint-3/dashboard
+    file_server
+
+    handle_path /api/* {
+        reverse_proxy 127.0.0.1:8000
+    }
+}

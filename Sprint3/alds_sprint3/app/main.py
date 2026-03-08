@@ -165,7 +165,7 @@ def _apply_mitigation(db: Session, user: User, login_event: LoginEvent) -> tuple
         mitigation_action = "session_kill"
         mitigation_status = "blocked"
 
-    elif login_event.event_action == "impossible_travel":
+    elif login_event.event_action in {"impossible_travel", "mfa_challenge_required"}:
         user.mfa_required = True
         _record_mitigation(db, "UC-015", login_event.username, "mfa_stepup")
         mitigation_action = "mfa_stepup"
