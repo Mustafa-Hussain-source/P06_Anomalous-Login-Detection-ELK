@@ -1,0 +1,8 @@
+{
+  "entity": "svc-account-demo",
+  "severity": "critical",
+  "context": {
+    "source": "demo-run",
+    "trigger": "manual"
+  }
+}
