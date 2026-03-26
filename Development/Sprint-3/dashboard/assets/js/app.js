@@ -1,9 +1,11 @@
 const API_BASE = "http://localhost:8000";
 
 const statusEl = document.getElementById("control-status");
+const statusIconEl = document.getElementById("status-icon");
 const eventsBody = document.getElementById("events-body");
 const mitigationsBody = document.getElementById("mitigations-body");
 const sprint4EvidenceBody = document.getElementById("sprint4-evidence-body");
+const evidenceCountEl = document.getElementById("evidence-count");
 
 let lastEventsSignature = "";
 let lastMitigationsSignature = "";
@@ -14,7 +16,12 @@ let pollInFlight = false;
 function formatTime(value) {
   if (!value) return "-";
   const date = new Date(value);
-  return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return date.toLocaleTimeString("en-US", {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 }
 
 // Render login events with enhanced status styling
@@ -22,17 +29,21 @@ function renderEvents(items) {
   eventsBody.innerHTML = "";
   items.forEach((item) => {
     const row = document.createElement("tr");
+    row.className = "hover:bg-white/5 transition-colors group";
+
     const isSuspicious = item.is_suspicious || (item.risk_score && item.risk_score > 50);
-    const statusClass = isSuspicious ? "status-suspicious" : "status-safe";
-    const statusText = isSuspicious ? "⚠ Suspicious" : "✓ Safe";
+    const statusClass = isSuspicious
+      ? "px-2 py-0.5 bg-rose-900/40 text-rose-400 text-[10px] font-bold uppercase"
+      : "px-2 py-0.5 bg-emerald-900/40 text-emerald-400 text-[10px] font-bold uppercase";
+    const statusText = isSuspicious ? "Suspicious" : "Safe";
     
     row.innerHTML = `
-      <td class="px-6 py-3 font-mono text-xs text-slate-400">${formatTime(item.timestamp)}</td>
-      <td class="px-6 py-3 text-sm text-slate-100 font-medium">${item.username || "-"}</td>
-      <td class="px-6 py-3 font-mono text-xs text-slate-300">${item.ip_address || "-"}</td>
-      <td class="px-6 py-3 text-sm text-slate-100">${item.country || "-"}</td>
-      <td class="px-6 py-3 font-mono text-xs text-slate-300">${item.event_action || "-"}</td>
-      <td class="px-6 py-3"><span class="${statusClass}">${statusText}</span></td>
+      <td class="px-6 py-4 font-mono text-xs text-on-surface-variant">${formatTime(item.timestamp)}</td>
+      <td class="px-6 py-4 font-body text-xs text-on-surface">${item.username || "-"}</td>
+      <td class="px-6 py-4 font-mono text-xs text-secondary">${item.ip_address || "-"}</td>
+      <td class="px-6 py-4 font-body text-xs text-on-surface-variant">${item.country || "-"}</td>
+      <td class="px-6 py-4 font-mono text-xs text-on-surface">${item.event_action || "-"}</td>
+      <td class="px-6 py-4"><span class="${statusClass}">${statusText}</span></td>
     `;
     eventsBody.appendChild(row);
   });
@@ -44,28 +55,32 @@ function renderMitigations(items) {
   items.forEach((item) => {
     const row = document.createElement("tr");
     let statusIcon = "schedule";
-    let statusClass = "status-pending";
+    let statusTextClass = "text-primary";
+    let statusLabel = item.status || "Pending";
     
     if (item.status === "Success" || item.status === "COMPLETED") {
       statusIcon = "check_circle";
-      statusClass = "status-success";
+      statusTextClass = "text-emerald-400";
+      statusLabel = "Success";
     } else if (item.status === "Failed" || item.status === "ERROR") {
       statusIcon = "error";
-      statusClass = "px-2 py-0.5 bg-red-950 text-red-400 text-xs font-mono font-bold uppercase rounded flex items-center gap-1";
+      statusTextClass = "text-error";
+      statusLabel = "Failed";
     } else if (item.status === "Pending" || item.status === "IN_PROGRESS") {
-      statusIcon = "hourglass_empty";
-      statusClass = "status-pending";
+      statusIcon = "autorenew";
+      statusTextClass = "text-primary";
+      statusLabel = "Pending";
     }
     
     row.innerHTML = `
-      <td class="px-6 py-3 font-mono text-xs text-slate-400">${formatTime(item.timestamp)}</td>
-      <td class="px-6 py-3 font-mono text-xs font-bold text-indigo-400">${item.uc_id || "-"}</td>
-      <td class="px-6 py-3 text-sm text-slate-100">${item.target_identifier || "-"}</td>
-      <td class="px-6 py-3 text-sm text-slate-300">${item.action || "-"}</td>
-      <td class="px-6 py-3">
-        <div class="flex items-center gap-1.5 ${statusClass}">
-          <span class="material-symbols-outlined text-xs" style="font-size: 14px;">${statusIcon}</span>
-          <span>${item.status}</span>
+      <td class="px-6 py-4 font-mono text-xs text-on-surface-variant">${formatTime(item.timestamp)}</td>
+      <td class="px-6 py-4 font-mono text-xs text-rose-400 font-bold">${item.uc_id || "-"}</td>
+      <td class="px-6 py-4 font-body text-xs text-on-surface">${item.target_identifier || "-"}</td>
+      <td class="px-6 py-4 font-body text-xs text-on-surface">${item.action || "-"}</td>
+      <td class="px-6 py-4">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined ${statusTextClass} text-sm">${statusIcon}</span>
+          <span class="text-xs ${statusTextClass} font-mono">${statusLabel}</span>
         </div>
       </td>
     `;
@@ -76,31 +91,35 @@ function renderMitigations(items) {
 // Render Sprint-4 evidence with collapsible details
 function renderSprint4Evidence(items) {
   sprint4EvidenceBody.innerHTML = "";
+  if (evidenceCountEl) {
+    evidenceCountEl.textContent = `TOTAL_OBJECTS: ${items.length}`;
+  }
+
   items.forEach((item, idx) => {
     const row = document.createElement("tr");
+    row.className = "group";
     const details = item.details ? JSON.stringify(item.details) : "-";
     const status = item.status || "PENDING";
-    let statusIcon = "pending";
+    let statusClass = "text-secondary";
     
     if (status === "COMMITTED" || status === "SUCCESS") {
-      statusIcon = "task_alt";
+      statusClass = "text-emerald-400";
     } else if (status === "ANALYZING" || status === "IN_PROGRESS") {
-      statusIcon = "autorenew";
+      statusClass = "text-secondary";
+    } else if (status === "FAILED" || status === "ERROR") {
+      statusClass = "text-error";
     }
     
     row.innerHTML = `
-      <td class="px-6 py-3 font-mono text-xs text-slate-400">${formatTime(item.timestamp)}</td>
-      <td class="px-6 py-3 font-mono text-xs font-bold text-indigo-400">${item.uc_id || "-"}</td>
-      <td class="px-6 py-3 text-xs text-slate-300 font-mono">${item.event || "-"}</td>
-      <td class="px-6 py-3 text-xs text-slate-300">${item.action || "-"}</td>
-      <td class="px-6 py-3">
-        <div class="flex items-center gap-1.5 text-xs font-mono text-indigo-400">
-          <span class="material-symbols-outlined" style="font-size: 14px;">${statusIcon}</span>
-          ${status}
+      <td class="px-6 py-4 font-mono text-xs text-on-surface-variant">${formatTime(item.timestamp)}</td>
+      <td class="px-6 py-4 font-mono text-xs text-on-surface">${item.uc_id || "-"}</td>
+      <td class="px-6 py-4 font-mono text-xs text-on-surface">${item.event || "-"}</td>
+      <td class="px-6 py-4 font-mono text-xs text-on-surface">${item.action || "-"}</td>
+      <td class="px-6 py-4 ${statusClass} font-mono text-xs">${status}</td>
+      <td class="px-6 py-4">
+        <div class="bg-surface-container-lowest p-2 rounded text-[10px] font-mono text-primary-fixed-dim max-w-xs overflow-hidden group-hover:bg-surface-container-highest transition-colors" title="${details}">
+          ${details}
         </div>
-      </td>
-      <td class="px-6 py-3">
-        <code class="text-xs bg-slate-800 text-amber-300 px-2 py-1 rounded block max-w-xs overflow-hidden text-ellipsis whitespace-nowrap cursor-help" title="${details}">${details}</code>
       </td>
     `;
     sprint4EvidenceBody.appendChild(row);
@@ -115,8 +134,14 @@ function buildSignature(items, fields) {
 // Update status display
 function updateStatus(message, isError = false) {
   statusEl.textContent = message;
-  statusEl.classList.toggle("text-red-400", isError);
-  statusEl.classList.toggle("text-slate-400", !isError);
+  statusEl.classList.toggle("text-error", isError);
+  statusEl.classList.toggle("text-emerald-400", !isError);
+
+  if (statusIconEl) {
+    statusIconEl.textContent = isError ? "wifi_off" : "check_circle";
+    statusIconEl.classList.toggle("text-error", isError);
+    statusIconEl.classList.toggle("text-emerald-400", !isError);
+  }
 }
 
 // Poll backend for updates
@@ -161,13 +186,13 @@ async function poll() {
       }
     }
     
-    if (eventsRes.ok && mitigationsRes.ok) {
-      updateStatus("Ready", false);
+    if (eventsRes.ok && mitigationsRes.ok && sprint4Res.ok) {
+      updateStatus("Connected: real-time polling active", false);
     } else {
-      updateStatus("API Error", true);
+      updateStatus("API unreachable: CONNECTION_REFUSED", true);
     }
   } catch (err) {
-    updateStatus("Offline", true);
+    updateStatus("API unreachable: CONNECTION_REFUSED", true);
   } finally {
     pollInFlight = false;
   }
@@ -193,48 +218,36 @@ async function triggerSimulation(endpoint, label) {
   }
 }
 
-// UC Button Handlers
-document.getElementById("btn-uc-012")?.addEventListener?.("click", () => {
-  triggerSimulation("/simulate/uc-012", "UC-012");
-}) ?? document.querySelector('[id="btn-uc-012"]')?.addEventListener?.("click", () => {
-  triggerSimulation("/simulate/uc-012", "UC-012");
-});
+const ucMap = {
+  "btn-uc-012": "012",
+  "btn-uc-013": "013",
+  "btn-uc-014": "014",
+  "btn-uc-015": "015",
+  "btn-uc-016": "016",
+  "btn-uc-018": "018",
+  "btn-uc-019": "019"
+};
 
-// Create buttons dynamically for each UC
-const ucs = ["012", "013", "014", "015", "016", "018", "019"];
-ucs.forEach(uc => {
-  const btn = document.querySelector(`[id*="btn-uc-${uc}"]`) || 
-              document.querySelector(`button:nth-of-type(${parseInt(uc) - 11})`);
-  if (btn) {
-    btn.addEventListener("click", () => {
-      triggerSimulation(`/simulate/uc-${uc}`, `UC-${uc}`);
-    });
-  }
-});
-
-// Update button event listeners to use selectors that match the HTML
-document.querySelectorAll("button").forEach((btn, idx) => {
-  const text = btn.textContent;
-  if (text.includes("UC-012")) {
-    btn.addEventListener("click", () => triggerSimulation("/simulate/uc-012", "UC-012"));
-  } else if (text.includes("UC-013")) {
-    btn.addEventListener("click", () => triggerSimulation("/simulate/uc-013", "UC-013"));
-  } else if (text.includes("UC-014")) {
-    btn.addEventListener("click", () => triggerSimulation("/simulate/uc-014", "UC-014"));
-  } else if (text.includes("UC-015")) {
-    btn.addEventListener("click", () => triggerSimulation("/simulate/uc-015", "UC-015"));
-  } else if (text.includes("UC-016")) {
-    btn.addEventListener("click", () => triggerSimulation("/simulate/uc-016", "UC-016"));
-  } else if (text.includes("UC-018")) {
-    btn.addEventListener("click", () => triggerSimulation("/simulate/uc-018", "UC-018"));
-  } else if (text.includes("UC-019")) {
-    btn.addEventListener("click", () => triggerSimulation("/simulate/uc-019", "UC-019"));
-  }
+Object.entries(ucMap).forEach(([id, uc]) => {
+  document.getElementById(id)?.addEventListener("click", () => {
+    triggerSimulation(`/simulate/uc-${uc}`, `UC-${uc}`);
+  });
 });
 
 // Traffic Control
 const trafficBtn = document.getElementById("btn-traffic");
 let trafficRunning = false;
+
+function setTrafficButtonLabel() {
+  if (!trafficBtn) return;
+  trafficBtn.textContent = trafficRunning ? "Stop Simulation" : "Start Simulation";
+  trafficBtn.classList.toggle("bg-[#10b981]", !trafficRunning);
+  trafficBtn.classList.toggle("hover:bg-[#059669]", !trafficRunning);
+  trafficBtn.classList.toggle("bg-rose-600", trafficRunning);
+  trafficBtn.classList.toggle("hover:bg-rose-500", trafficRunning);
+}
+
+setTrafficButtonLabel();
 
 async function toggleTraffic() {
   const endpoint = trafficRunning ? "/traffic/stop" : "/traffic/start";
@@ -246,8 +259,8 @@ async function toggleTraffic() {
       return;
     }
     trafficRunning = !trafficRunning;
-    trafficBtn.textContent = trafficRunning ? "⏹ Stop Simulation" : "▶ Start Simulation";
-    updateStatus(trafficRunning ? "Simulation running" : "Ready", false);
+    setTrafficButtonLabel();
+    updateStatus(trafficRunning ? "Simulation running" : "Connected: real-time polling active", false);
     setTimeout(() => poll(), 500);
   } catch (err) {
     updateStatus("Traffic control failed", true);
@@ -268,7 +281,7 @@ async function clearEvents() {
       return;
     }
     await poll();
-    updateStatus("Ready", false);
+    updateStatus("Connected: real-time polling active", false);
   } catch (err) {
     updateStatus("Clear failed", true);
   }
