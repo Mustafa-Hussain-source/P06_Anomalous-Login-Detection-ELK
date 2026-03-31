@@ -4,7 +4,7 @@ Code: P06
 Team: Names and IDs of Team Members
 - Muhammad Aaffan Khan Niazi - 26100015
 - Mustafa Hussain - <ID_PENDING>
-- Team Member 3 - <ID_PENDING>
+- Shehroz Faryad - 25100022
 - Team Member 4 - <ID_PENDING>
 - Team Member 5 - <ID_PENDING>
 
