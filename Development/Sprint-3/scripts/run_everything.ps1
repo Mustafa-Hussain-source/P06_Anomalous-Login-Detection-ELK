@@ -57,12 +57,15 @@ $verifyScript = Join-Path $ProjectRoot "scripts\demo_verify.ps1"
 $syncLoopScript = Join-Path $ProjectRoot "scripts\sync_es_to_wazuh_indexer_loop.ps1"
 $composePath = Join-Path $ProjectRoot "elk-wazuh-compose"
 
+$escapedProjectRoot = $ProjectRoot -replace "'", "''"
+$escapedVenvPython = $venvPython -replace "'", "''"
+
 if (-not (Test-Path $venvPython)) {
     throw "Virtual environment python not found at: $venvPython"
 }
 
 Write-Info "[A] Starting FastAPI uvicorn in detached PowerShell..."
-$apiCommand = "Set-Location -LiteralPath '$ProjectRoot'; & '$venvPython' -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+$apiCommand = "Set-Location -LiteralPath '$escapedProjectRoot'; & '$escapedVenvPython' -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
 Start-DetachedPowerShell -ScriptOrCommand $apiCommand
 
 Write-Info "Waiting for API readiness..."
