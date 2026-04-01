@@ -24,12 +24,22 @@ Completed Use Cases:
   Developer: Muhammad Aaffan Khan Niazi
 - UC-019: Automated Containment Ticket Creation
   Developer: Muhammad Aaffan Khan Niazi
+- UC-017: Login Attempt from Blocked Geographic Region
+  Developer: Shehroz Faryad
+- UC-020: Password Spray Attack Detection & Temporary Access Restriction
+  Developer: Shehroz Faryad
 
 Implemented artifacts:
 - UC automation engine: `Development/Sprint-4/uc_automation.py`
 - System tests for UC automation: `Development/Sprint-4/test_uc_automation.py`
 - Sprint-4 test cases file: `Development/Sprint-4/ALDS_Test_Cases_10UC.xlsx`
 - Mitigation evidence logs: `Development/Sprint-4/artifacts/*.jsonl`
+- Wazuh custom detection rules: `wazuh-docker/single-node/config/wazuh_manager/local_rules.xml`
+- Logstash enrichment pipeline (GeoIP simulation): `elk-bridge/logstash/pipeline/wazuh.conf`
+- ELK stack deployment: `elk-bridge/docker-compose.elk.yml`
+- Test environment: Victim VM (Linux Mint with Wazuh agent) / Attacker VM (VPN-enabled for simulation)
+- Attack simulation tools: Hydra (password spray simulation) SSH (manual failed login attempts)
+
 
 ------------------------------------------------------------------------------------------------
 
@@ -58,6 +68,65 @@ Credentials:
 - No default user credentials are required for the local Sprint-4 UC simulation scripts.
 - If deployed service credentials are needed for live infra, use the team deployment secrets file (not committed to repository).
 
+
+------------------------------------------------------------------------------------------------
+
+HOW TO ACCESS THE SYSTEM (For UC-017 and UC-020)
+
+Option 1: Run ELK Stack
+
+Navigate to: elk-bridge
+Run: docker compose -f docker-compose.elk.yml up -d
+
+Ensure Wazuh manager is running separately from:
+wazuh-docker/single-node
+
+Option 2: Generate Attack Events
+
+Password Spray Simulation:
+hydra -L users.txt -p wrongpassword ssh://192.168.56.104 -t 4
+
+Manual Failed Login:
+ssh user1@192.168.56.104
+
+Option 3: View Detection in Kibana
+
+Open: http://localhost:5602
+Go to Discover → wazuh-alerts-*
+
+Example Queries:
+
+Blocked Country Use Case:
+use_case.name : "Blocked Country Login Attempt"
+
+Password Spray Use Case:
+rule.id : "100210"
+
+Combined Filter (Demo):
+rule.id : "5760" and simulated_geo.policy : "blocked_country"
+
+Evidence Output:
+Wazuh alerts log:
+/var/ossec/logs/alerts/alerts.json
+Elasticsearch index:
+wazuh-alerts-*
+Enriched fields include:
+simulated_geo.country_name
+simulated_geo.policy
+use_case.name
+tags
+
+Credentials:
+
+No default credentials required for simulation.
+Test users created on victim VM (e.g., user1, user2).
+
+
+GeoIP functionality is simulated using Logstash enrichment due to lab environment constraints.
+Active Response is configured for temporary containment instead of permanent blocking.
+The system demonstrates a full pipeline: detection (Wazuh), enrichment (Logstash), visualization (Kibana), and response (Active Response).
+
+
 ------------------------------------------------------------------------------------------------
 
 ADDITIONAL INFORMATION
@@ -68,3 +137,5 @@ ADDITIONAL INFORMATION
   `Development/Sprint-4/k8s/`
 - This README reflects the cleaned Sprint-4 folder structure after documentation pruning and artifact retention.
 - Team member IDs can be finalized in this file before final submission.
+
+- 
