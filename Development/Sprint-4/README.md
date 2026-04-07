@@ -3,9 +3,9 @@ Code: P06
 
 Team: Names and IDs of Team Members
 - Muhammad Aaffan Khan Niazi - 26100015
-- Mustafa Hussain - <26100399>
+- Mustafa Hussain - 26100399
 - Shehroz Faryad - 25100022
-- Mohammad Mustafa - <26100286>
+- Mohammad Mustafa - 26100286
 
 ### LIST OF REQUIREMENTS COMPLETED IN THE SPRINT
 
