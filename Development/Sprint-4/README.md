@@ -3,19 +3,11 @@ Code: P06
 
 Team: Names and IDs of Team Members
 - Muhammad Aaffan Khan Niazi - 26100015
-- Mustafa Hussain - <ID_PENDING>
+- Mustafa Hussain - <26100399>
 - Shehroz Faryad - 25100022
-- Team Member 4 - <ID_PENDING>
-- Team Member 5 - <ID_PENDING>
+- Mohammad Mustafa - <26100286>
 
-SPRINT-4 SUBMISSION GUIDELINES
-
-1. This "Readme" file is uploaded in the Sprint-4 folder.
-2. Submission details are followed from the Project Deadlines document.
-
-------------------------------------------------------------------------------------------------
-
-LIST OF REQUIREMENTS COMPLETED IN THE SPRINT
+### LIST OF REQUIREMENTS COMPLETED IN THE SPRINT
 
 Completed Use Cases:
 - UC-016: Auto-Revoke Compromised API Keys
@@ -43,7 +35,7 @@ Implemented artifacts:
 
 ------------------------------------------------------------------------------------------------
 
-HOW TO ACCESS THE SYSTEM
+### HOW TO ACCESS THE SYSTEM
 
 Option 1: Run Sprint-4 UC automation locally
 1. Open terminal in `Development/Sprint-4`.
@@ -71,7 +63,7 @@ Credentials:
 
 ------------------------------------------------------------------------------------------------
 
-HOW TO ACCESS THE SYSTEM (For UC-017 and UC-020)
+### HOW TO ACCESS THE SYSTEM (For UC-017 and UC-020)
 
 Option 1: Run ELK Stack
 
@@ -129,7 +121,7 @@ The system demonstrates a full pipeline: detection (Wazuh), enrichment (Logstash
 
 ------------------------------------------------------------------------------------------------
 
-ADDITIONAL INFORMATION
+### ADDITIONAL INFORMATION
 
 - Sprint-4 secure coding/threat-modeling evidence is included in:
   `Development/Sprint-4/P06_Secure Coding-Threat Modeling_Sprint4.docx`
@@ -137,5 +129,3 @@ ADDITIONAL INFORMATION
   `Development/Sprint-4/k8s/`
 - This README reflects the cleaned Sprint-4 folder structure after documentation pruning and artifact retention.
 - Team member IDs can be finalized in this file before final submission.
-
-- 
