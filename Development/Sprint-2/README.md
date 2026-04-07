@@ -1,139 +1,91 @@
-# Sprint 2 README — ALDS (Abnormal Login Detection System)
+# Project: ALDS (Abnormal Login Detection System) — Sprint 2 (PO6)
 
-**Sprint:** 2
-**Duration:** Dec 05, 2025 – January 25, 2026
-**Estimate:** 0
-**Focus:** Real-time detection of unusual/suspicious login activity using ELK Stack + Wazuh
+**Team:** Mohammad Mustafa (26100286), Muhammad Aaffan Khan Niazi (26100015), Mustafa Hussain (26100399), Shehroz Faryad (25100022)
 
----
 
-## 1. Overview
+## LIST OF REQUIREMENTS COMPLETED IN THE SPRINT
 
-The **Abnormal Login Detection System (ALDS)** is designed to detect unusual or suspicious authentication activity in real time. The system collects authentication logs, analyzes them for security-relevant patterns, and generates alerts when abnormal behavior is detected.
+* UC-008: Triage Alert in Kibana *(Developed by: Mohammad Mustafa | Status: Done)*
 
-This sprint focuses on implementing and validating core use cases for login anomaly detection and improving operational visibility through dashboards and alerts.
+* UC-009: Contain Account *(Developed by: Shehroz Faryad | Status: In progress)*
 
----
+* UC-010: Tune Detection *(Developed by: Mustafa Hussain | Status: In progress)*
 
-## 2. Objectives
+* UC-011: Generate Weekly Report *(Developed by: Aaffan Khan Niazi | Status: Done)*
 
-The primary goals of Sprint 2 are:
+* Real-time authentication log collection using ELK Stack and Wazuh *(Developed by: Shehroz Faryad)*
 
-* Collect and process authentication logs using the **ELK stack** (Elasticsearch, Logstash, Kibana) and **Wazuh**
-* Detect suspicious patterns such as:
+* Detection of suspicious login patterns (e.g., brute-force attempts, location anomalies) *(Developed by: Aaffan Khan Niazi)*
 
-  * Multiple login attempts within a short period (possible brute-force activity)
-  * Abrupt or unexpected changes in login location (possible account compromise)
-* Provide security teams with:
+* Dashboard-based monitoring and alert visualization *(Developed by: Mohammad Mustafa and Mustafa Hussain)*
 
-  * A clear dashboard view of login activity
-  * Real-time alerts for abnormal behavior
-* Reduce manual investigation time by minimizing the need to inspect raw logs
+* Alert generation and triage support *(Developed by: Mohammad Mustafa)*
 
----
+* Weekly reporting functionality *(Developed by: Aaffan Khan Niazi)*
+  
 
-## 3. Target Users
+## HOW TO ACCESS THE SYSTEM
 
-This system is intended for:
+### 1) System Overview
 
-* **System Administrators**
-* **Security Engineers / SOC Analysts**
+The system detects abnormal login behavior in real time using:
 
-These users rely on ALDS for rapid detection, investigation support, and faster response to suspicious login behavior.
+* ELK Stack (Elasticsearch, Logstash, Kibana)
+* Wazuh for security monitoring
 
----
+### 2) Access Components
 
-## 4. Sprint 2 Scope (Use Cases)
+* **Kibana Dashboard:**
+  Used for visualizing login activity and triaging alerts
 
-Sprint 2 includes the following use cases:
+* **Logstash Pipelines:**
+  Process authentication logs and forward them to Elasticsearch
 
-### UC-008: Triage Alert in Kibana
+* **Wazuh:**
+  Generates alerts based on defined security rules
 
-**Status:** In progress
-**Goal:** Enable analysts to triage abnormal login alerts through Kibana dashboards with relevant context and filtering.
+*(Add URLs, credentials, or local setup instructions if required)*
 
-### UC-009: Contain Account
 
-**Status:** In progress
-**Goal:** Support containment workflows when suspicious activity is confirmed (e.g., actions to reduce risk and prevent unauthorized access).
+## ADDITIONAL INFORMATION
 
-### UC-010: Tune Detection
+* **Sprint Duration:** Dec 05, 2025 – January 25, 2026
+* **Sprint Focus:** Real-time detection of unusual/suspicious login activity
 
-**Status:** In progress
-**Goal:** Improve detection quality by adjusting rules/thresholds to reduce false positives and increase detection confidence.
+### Key Functional Highlights
 
-### UC-011: Generate Weekly Report
+* Detection of:
 
-**Status:** Done
-**Goal:** Produce a weekly security report summarizing abnormal login activity and notable events for review and auditing.
+  * Multiple rapid login attempts (brute-force behavior)
+  * Sudden login location changes (potential account compromise)
 
----
+* Provides:
 
-## 5. Key Features Delivered / In Progress
+  * Real-time alerts
+  * Dashboard-based monitoring
+  * Reduced manual log inspection
 
-### Detection and Monitoring
+### Threat Modeling (STRIDE)
 
-* Real-time collection of authentication logs
-* Pattern-based detection for suspicious login behaviors
-* Centralized visibility through dashboards
-
-### Alerting and Response Support
-
-* Alert generation for anomalous login activity
-* Analyst triage workflows supported through Kibana views
-* Early-stage containment workflow integration (in progress)
-
-### Reporting
-
-* Weekly reporting capability for summary and review (completed)
-
----
-
-## 6. Threat Modeling and Security Controls (STRIDE)
-
-This sprint includes STRIDE-based threat modeling for ALDS use cases. The threat model is treated as a **living artifact** and is updated each sprint as new use cases are implemented.
-
-Threat modeling goals include:
-
-* Identifying threats across implemented use cases
-* Defining controls to mitigate:
+* Threat modeling is maintained as a continuous process
+* Covers:
 
   * Spoofing
   * Tampering
   * Repudiation
-  * Information disclosure
-  * Denial of service
-  * Elevation of privilege
+  * Information Disclosure
+  * Denial of Service
+  * Elevation of Privilege
 
----
+### Expected Outcomes
 
-## 7. Expected Outcomes
+* Faster detection of suspicious login activity
+* Reduced investigation time via dashboards
+* Improved alert accuracy through tuning
+* Structured weekly reporting for auditing
 
-By the end of Sprint 2, the system should provide:
+### Notes
 
-* Faster detection of abnormal login activity
-* Reduced time-to-investigation through dashboards and structured alert triage
-* Real-time alerts enabling rapid response to potential threats
-* Improved monitoring reliability through detection tuning and reporting
-
----
-
-## 8. Sprint 2 Status Summary
-
-| Use Case | Title                  | Status      |
-| -------- | ---------------------- | ----------- |
-| UC-008   | Triage Alert in Kibana | In progress |
-| UC-009   | Contain Account        | In progress |
-| UC-010   | Tune Detection         | In progress |
-| UC-011   | Generate Weekly Report | Done        |
-
----
-
-## 9. Notes
-
-* Sprint 2 continues to build foundational capabilities for real-time login anomaly detection.
-* STRIDE threat modeling is updated continuously as new use cases are added or refined.
-
----
-
+* Sprint 2 establishes foundational capabilities for anomaly detection
+* Detection rules and threat models are continuously refined in future sprints
 
