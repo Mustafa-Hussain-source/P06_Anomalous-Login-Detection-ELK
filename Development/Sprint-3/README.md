@@ -1,4 +1,4 @@
-# Project: ALDS Sprint 3
+# Project: ALDS Sprint 3 (PO6)
 
 Team: Mohammad Mustafa (26100286), Muhammad Aaffan Khan Niazi (26100015), Mustafa Hussain (26100399), Shehroz Faryad (25100022)
 
