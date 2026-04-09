@@ -16,10 +16,16 @@ Completed Use Cases:
   Developer: Muhammad Aaffan Khan Niazi
 - UC-019: Automated Containment Ticket Creation
   Developer: Muhammad Aaffan Khan Niazi
-- UC-017: Login Attempt from Blocked Geographic Region
+- UC-024: Login Attempt from Blocked Geographic Region
   Developer: Shehroz Faryad
-- UC-020: Password Spray Attack Detection & Temporary Access Restriction
+- UC-023: Password Spray Attack Detection & Temporary Access Restriction
   Developer: Shehroz Faryad
+- UC-020: IPS Rollback on False Positives
+  Developer: Mohammad Mustafa
+- UC-022: Parallel Full Stack Admin Dashboard
+  Developer: Mohammad Mustafa
+- UC-017: Auto-Disable VPN Access on Suspected Compromise
+  Developer: Mustafa Hussain
 
 Implemented artifacts:
 - UC automation engine: `Development/Sprint-4/uc_automation.py`
