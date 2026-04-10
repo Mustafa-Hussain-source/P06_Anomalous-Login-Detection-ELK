@@ -13,6 +13,7 @@ spec:
       labels:
         app: alds-api
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: alds-api
           image: alds-sprint3-api:latest
