@@ -97,6 +97,10 @@ jobs:
       - name: SonarCloud scan
         if: steps.sonar-precheck.outputs.enabled == 'true'
         uses: SonarSource/sonarqube-scan-action@v6
+        with:
+          args: >
+            -Dsonar.projectKey=Mustafa-Hussain-source_P06_Anomalous-Login-Detection-ELK
+            -Dsonar.organization=mustafa-hussain-source
         env:
           SONAR_HOST_URL: https://sonarcloud.io
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
