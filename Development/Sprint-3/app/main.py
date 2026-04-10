@@ -545,6 +545,41 @@ def _handle_blacklisted_ip(db, username, client_ip, payload, client_country, use
     )
 
     return "BLOCKED"
+def _handle_locked_user(db, user, username, client_ip, payload, client_country):
+    if not user.is_locked:
+        return None
+
+    locked_event = LoginEvent(
+        username=username,
+        ip_address=client_ip,
+        user_agent=payload.user_agent,
+        country=client_country,
+        is_suspicious=True,
+        risk_score=95,
+        event_action="account_locked_block",
+        device_fingerprint=payload.device_fingerprint,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        impossible_travel=False,
+        timestamp=datetime.now().astimezone(),
+    )
+
+    db.add(locked_event)
+    db.commit()
+    db.refresh(locked_event)
+
+    _record_mitigation(db, "UC-012", username, "account_lock")
+    db.commit()
+
+    _emit_security_alert(
+        locked_event,
+        user.id,
+        mitigation_action="account_lock",
+        mitigation_status="blocked",
+    )
+
+    return "LOCKED"
+
 def login(
     payload: LoginRequest,
     db: Session = Depends(get_db),
@@ -578,34 +613,11 @@ def login(
     if blacklist_result:
         raise HTTPException(status_code=403, detail="ip blacklisted")
 
-    if user.is_locked:
-        locked_event = LoginEvent(
-            username=username,
-            ip_address=client_ip,
-            user_agent=payload.user_agent,
-            country=client_country,
-            is_suspicious=True,
-            risk_score=95,
-            event_action="account_locked_block",
-            device_fingerprint=payload.device_fingerprint,
-            latitude=payload.latitude,
-            longitude=payload.longitude,
-            impossible_travel=False,
-            timestamp=datetime.now().astimezone(),
-        )
-        db.add(locked_event)
-        db.commit()
-        db.refresh(locked_event)
+    lock_result = _handle_locked_user(
+        db, user, username, client_ip, payload, client_country
+    )
 
-        _record_mitigation(db, "UC-012", username, "account_lock")
-        db.commit()
-
-        _emit_security_alert(
-            locked_event,
-            user.id,
-            mitigation_action="account_lock",
-            mitigation_status="blocked",
-        )
+    if lock_result:
         raise HTTPException(status_code=403, detail="account locked")
 
     if x_seed_session == "true" and payload.device_fingerprint:
