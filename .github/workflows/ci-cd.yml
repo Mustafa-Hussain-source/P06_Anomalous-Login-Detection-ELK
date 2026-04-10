@@ -100,7 +100,7 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=Mustafa-Hussain-source_P06_Anomalous-Login-Detection-ELK
-            -Dsonar.organization=mustafa-hussain-source
+            -Dsonar.organization=Mustafa-Hussain-source
         env:
           SONAR_HOST_URL: https://sonarcloud.io
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
