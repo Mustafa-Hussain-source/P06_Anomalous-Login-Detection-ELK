@@ -633,6 +633,44 @@ def _evaluate_login_risk(db, user, username, payload, client_country):
         impossible_travel,
     )
 
+def _handle_session_and_device(db, user, payload, existing_session, is_success, event_action, is_suspicious, risk_score):
+    if is_success and payload.device_fingerprint:
+        if existing_session and existing_session.device_fingerprint != payload.device_fingerprint:
+            event_action = "device_fingerprint_change"
+            is_suspicious = True
+            risk_score = max(risk_score, 90)
+            db.delete(existing_session)
+        elif existing_session:
+            db.delete(existing_session)
+
+        db.add(
+            ActiveSession(
+                user_id=user.id,
+                device_fingerprint=payload.device_fingerprint,
+            )
+        )
+
+    return event_action, is_suspicious, risk_score
+
+def _build_ip(event_action, x_forwarded_for, client_ip):
+    if event_action == "geofence_violation":
+        return x_forwarded_for or "5.255.255.1"
+    return client_ip
+
+def _handle_mitigation_and_alert(db, user, payload, login_event):
+    mitigation_action, mitigation_status = _apply_mitigation(db, user, login_event)
+    sprint4_action, sprint4_status = _apply_sprint4_runtime_mitigations(db, payload, login_event)
+
+    combined_actions = [v for v in [mitigation_action, sprint4_action] if v]
+    combined_statuses = [v for v in [mitigation_status, sprint4_status] if v]
+
+    final_action = ",".join(combined_actions) if combined_actions else None
+    final_status = ",".join(combined_statuses) if combined_statuses else None
+
+    _emit_security_alert(login_event, user.id, final_action, final_status)
+
+    return final_action, final_status
+
 def login(
     payload: LoginRequest,
     db: Session = Depends(get_db),
@@ -697,24 +735,14 @@ def login(
     existing_session = (
         db.query(ActiveSession).filter(ActiveSession.user_id == user.id).first()
     )
-    if is_success and payload.device_fingerprint:
-        if existing_session and existing_session.device_fingerprint != payload.device_fingerprint:
-            event_action = "device_fingerprint_change"
-            is_suspicious = True
-            risk_score = max(risk_score, 90)
-            db.delete(existing_session)
-        elif existing_session:
-            db.delete(existing_session)
-
-        db.add(
-            ActiveSession(user_id=user.id, device_fingerprint=payload.device_fingerprint)
-        )
+    event_action, is_suspicious, risk_score = _handle_session_and_device(
+        db, user, payload, existing_session, is_success, event_action, is_suspicious, risk_score
+    )
 
     if event_action == "geofence_violation":
         country = "RU"
-        ip_address = x_forwarded_for or "5.255.255.1"
-    else:
-        ip_address = client_ip
+
+    ip_address = _build_ip(event_action, x_forwarded_for, client_ip)
 
     login_event = LoginEvent(
         username=username,
@@ -734,18 +762,8 @@ def login(
     db.commit()
     db.refresh(login_event)
 
-    mitigation_action = None
-    mitigation_status = None
     if is_suspicious:
-        mitigation_action, mitigation_status = _apply_mitigation(db, user, login_event)
-        sprint4_action, sprint4_status = _apply_sprint4_runtime_mitigations(db, payload, login_event)
-
-        combined_actions = [value for value in [mitigation_action, sprint4_action] if value]
-        combined_statuses = [value for value in [mitigation_status, sprint4_status] if value]
-        mitigation_action = ",".join(combined_actions) if combined_actions else None
-        mitigation_status = ",".join(combined_statuses) if combined_statuses else None
-
-        _emit_security_alert(login_event, user.id, mitigation_action, mitigation_status)
+        _handle_mitigation_and_alert(db, user, payload, login_event)
 
     if event_action == "geofence_violation":
         return LoginResponse(success=False, message="geofence blocked")
