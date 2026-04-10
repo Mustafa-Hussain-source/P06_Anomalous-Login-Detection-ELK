@@ -136,20 +136,33 @@ def _record_mitigation(
         )
     )
 
+def _handle_uc_result(db, uc_code, target, action_name, result, actions, statuses):
+    if result.status == "success":
+        _record_mitigation(
+            db,
+            uc_code,
+            target,
+            action_name,
+            status="success",
+        )
+        actions.append(result.action)
+        statuses.append(result.status)
 
 def _apply_sprint4_runtime_mitigations(
     db: Session,
     payload: LoginRequest,
     login_event: LoginEvent,
 ) -> tuple[str | None, str | None]:
+
     if SPRINT4_ENGINE is None:
         return None, None
 
     actions: list[str] = []
     statuses: list[str] = []
 
+    #UC-016
     if payload.api_key_compromised:
-        uc_016_result = SPRINT4_ENGINE.run_uc_action(
+        result = SPRINT4_ENGINE.run_uc_action(
             "UC-016",
             {
                 "user_id": login_event.username,
@@ -157,18 +170,18 @@ def _apply_sprint4_runtime_mitigations(
                 "compromised": payload.api_key_compromised,
             },
         )
-        if uc_016_result.status == "success":
-            _record_mitigation(
-                db,
-                "UC-016",
-                payload.api_key_id or login_event.username,
-                "api_key_revoke",
-                status="success",
-            )
-            actions.append(uc_016_result.action)
-            statuses.append(uc_016_result.status)
+        _handle_uc_result(
+            db,
+            "UC-016",
+            payload.api_key_id or login_event.username,
+            "api_key_revoke",
+            result,
+            actions,
+            statuses,
+        )
 
-    uc_018_result = SPRINT4_ENGINE.run_uc_action(
+    #UC-018
+    result = SPRINT4_ENGINE.run_uc_action(
         "UC-018",
         {
             "username": login_event.username,
@@ -177,19 +190,19 @@ def _apply_sprint4_runtime_mitigations(
             "threshold": 0.85,
         },
     )
-    if uc_018_result.status == "success":
-        _record_mitigation(
-            db,
-            "UC-018",
-            login_event.username,
-            "admin_console_block",
-            status="success",
-        )
-        actions.append(uc_018_result.action)
-        statuses.append(uc_018_result.status)
+    _handle_uc_result(
+        db,
+        "UC-018",
+        login_event.username,
+        "admin_console_block",
+        result,
+        actions,
+        statuses,
+    )
 
+    # UC-019
     if login_event.is_suspicious and login_event.risk_score >= 85:
-        uc_019_result = SPRINT4_ENGINE.run_uc_action(
+        result = SPRINT4_ENGINE.run_uc_action(
             "UC-019",
             {
                 "entity": payload.containment_entity or login_event.username,
@@ -202,20 +215,20 @@ def _apply_sprint4_runtime_mitigations(
                 },
             },
         )
-        if uc_019_result.status == "success":
-            _record_mitigation(
-                db,
-                "UC-019",
-                payload.containment_entity or login_event.username,
-                "containment_ticket_create",
-                status="success",
-            )
-            actions.append(uc_019_result.action)
-            statuses.append(uc_019_result.status)
+        _handle_uc_result(
+            db,
+            "UC-019",
+            payload.containment_entity or login_event.username,
+            "containment_ticket_create",
+            result,
+            actions,
+            statuses,
+        )
 
     if actions:
         db.commit()
         return ",".join(actions), ",".join(statuses)
+
     return None, None
 
 
