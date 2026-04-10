@@ -505,6 +505,46 @@ def _get_impossible_travel(
 
 
 @app.post("/login", response_model=LoginResponse)
+def _handle_blacklisted_ip(db, username, client_ip, payload, client_country, user):
+    blacklisted_ip = (
+        db.query(IpBlacklist)
+        .filter(IpBlacklist.ip_address == client_ip)
+        .one_or_none()
+    )
+
+    if not blacklisted_ip:
+        return None
+
+    blacklisted_event = LoginEvent(
+        username=username,
+        ip_address=client_ip,
+        user_agent=payload.user_agent,
+        country=client_country,
+        is_suspicious=True,
+        risk_score=95,
+        event_action="ip_blacklist_block",
+        device_fingerprint=payload.device_fingerprint,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        impossible_travel=False,
+        timestamp=datetime.now().astimezone(),
+    )
+
+    db.add(blacklisted_event)
+    db.commit()
+    db.refresh(blacklisted_event)
+
+    _record_mitigation(db, "UC-013", client_ip, "ip_block")
+    db.commit()
+
+    _emit_security_alert(
+        blacklisted_event,
+        user.id,
+        mitigation_action="ip_block",
+        mitigation_status="blocked",
+    )
+
+    return "BLOCKED"
 def login(
     payload: LoginRequest,
     db: Session = Depends(get_db),
@@ -531,39 +571,11 @@ def login(
     client_ip = x_forwarded_for or "127.0.0.1"
     client_country = x_country or "PK"
 
-    blacklisted_ip = (
-        db.query(IpBlacklist)
-        .filter(IpBlacklist.ip_address == client_ip)
-        .one_or_none()
+    blacklist_result = _handle_blacklisted_ip(
+        db, username, client_ip, payload, client_country, user
     )
-    if blacklisted_ip:
-        blacklisted_event = LoginEvent(
-            username=username,
-            ip_address=client_ip,
-            user_agent=payload.user_agent,
-            country=client_country,
-            is_suspicious=True,
-            risk_score=95,
-            event_action="ip_blacklist_block",
-            device_fingerprint=payload.device_fingerprint,
-            latitude=payload.latitude,
-            longitude=payload.longitude,
-            impossible_travel=False,
-            timestamp=datetime.now().astimezone(),
-        )
-        db.add(blacklisted_event)
-        db.commit()
-        db.refresh(blacklisted_event)
 
-        _record_mitigation(db, "UC-013", client_ip, "ip_block")
-        db.commit()
-
-        _emit_security_alert(
-            blacklisted_event,
-            user.id,
-            mitigation_action="ip_block",
-            mitigation_status="blocked",
-        )
+    if blacklist_result:
         raise HTTPException(status_code=403, detail="ip blacklisted")
 
     if user.is_locked:
