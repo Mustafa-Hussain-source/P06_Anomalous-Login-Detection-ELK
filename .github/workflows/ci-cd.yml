@@ -54,7 +54,7 @@ jobs:
         working-directory: Development/Sprint-4
         run: |
           coverage run -m unittest test_uc_automation.py
-          coverage xml -o coverage.xml
+          coverage xml
 
       - name: Dependency check
         working-directory: Development/Sprint-3
