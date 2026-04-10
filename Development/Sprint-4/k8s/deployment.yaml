@@ -16,7 +16,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: alds-api
-          image: alds-sprint3-api:latest
+          image: alds-sprint3-api:v1.0
           imagePullPolicy: IfNotPresent
           resources:
             requests:
