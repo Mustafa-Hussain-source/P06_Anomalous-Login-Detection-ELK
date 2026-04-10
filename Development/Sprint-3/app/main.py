@@ -580,6 +580,59 @@ def _handle_locked_user(db, user, username, client_ip, payload, client_country):
 
     return "LOCKED"
 
+def _evaluate_login_risk(db, user, username, payload, client_country):
+    is_success = payload.password == "password123"
+    event_action = "login_success" if is_success else "login_failure"
+    is_suspicious = not is_success
+    risk_score = 80 if is_suspicious else 5
+    country = client_country
+
+    if is_success:
+        if username == RUSSIAN_THREAT_ACTOR:
+            country = "RU"
+            event_action = "geofence_violation"
+            is_suspicious = True
+            risk_score = max(risk_score, 85)
+            is_success = False
+
+        if country in {"RU", "CN", "KP"}:
+            event_action = "geofence_violation"
+            is_suspicious = True
+            risk_score = max(risk_score, 85)
+            is_success = False
+
+        impossible_travel = _get_impossible_travel(
+            db, username, payload.latitude, payload.longitude
+        )
+        if impossible_travel:
+            event_action = "impossible_travel"
+            is_suspicious = True
+            risk_score = max(risk_score, 95)
+    else:
+        impossible_travel = False
+
+    if username == MALICIOUS_ENTITY:
+        is_success = False
+        is_suspicious = True
+        risk_score = max(risk_score, 90)
+        if event_action == "login_success":
+            event_action = "blocked_malicious_actor"
+
+    if is_success and user.mfa_required:
+        is_success = False
+        is_suspicious = True
+        risk_score = max(risk_score, 75)
+        event_action = "mfa_challenge_required"
+
+    return (
+        is_success,
+        event_action,
+        is_suspicious,
+        risk_score,
+        country,
+        impossible_travel,
+    )
+
 def login(
     payload: LoginRequest,
     db: Session = Depends(get_db),
@@ -632,46 +685,14 @@ def login(
         db.commit()
         return LoginResponse(success=True, message="session seeded")
 
-    is_success = payload.password == "password123"
-    event_action = "login_success" if is_success else "login_failure"
-    is_suspicious = not is_success
-    risk_score = 80 if is_suspicious else 5
-    country = client_country
-
-    if is_success:
-        if username == RUSSIAN_THREAT_ACTOR:
-            country = "RU"
-            event_action = "geofence_violation"
-            is_suspicious = True
-            risk_score = max(risk_score, 85)
-            is_success = False
-
-        if country in {"RU", "CN", "KP"}:
-            event_action = "geofence_violation"
-            is_suspicious = True
-            risk_score = max(risk_score, 85)
-            is_success = False
-
-        impossible_travel = _get_impossible_travel(db, username, payload.latitude, payload.longitude)
-        if impossible_travel:
-            event_action = "impossible_travel"
-            is_suspicious = True
-            risk_score = max(risk_score, 95)
-    else:
-        impossible_travel = False
-
-    if username == MALICIOUS_ENTITY:
-        is_success = False
-        is_suspicious = True
-        risk_score = max(risk_score, 90)
-        if event_action == "login_success":
-            event_action = "blocked_malicious_actor"
-
-    if is_success and user.mfa_required:
-        is_success = False
-        is_suspicious = True
-        risk_score = max(risk_score, 75)
-        event_action = "mfa_challenge_required"
+    (
+        is_success,
+        event_action,
+        is_suspicious,
+        risk_score,
+        country,
+        impossible_travel,
+    ) = _evaluate_login_risk(db, user, username, payload, client_country)
 
     existing_session = (
         db.query(ActiveSession).filter(ActiveSession.user_id == user.id).first()
