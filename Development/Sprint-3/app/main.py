@@ -28,6 +28,7 @@ from .simulator import (
     simulate_uc_018,
     simulate_uc_019,
 )
+from typing import Annotated
 
 BASE_URL = "http://localhost:8000"
 
@@ -675,7 +676,7 @@ def _handle_mitigation_and_alert(db, user, payload, login_event):
 
 def login(
     payload: LoginRequest,
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
     x_forwarded_for: str | None = Header(default=None, alias="X-Forwarded-For"),
     x_country: str | None = Header(default=None, alias="X-Country"),
     x_seed_session: str | None = Header(default=None, alias="X-Seed-Session"),
