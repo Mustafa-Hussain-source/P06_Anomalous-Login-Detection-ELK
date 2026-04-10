@@ -776,7 +776,7 @@ def login(
 
 
 @app.get("/events")
-def list_events(limit: int = 50, db: Session = Depends(get_db)):
+def list_events(db: Annotated[Session, Depends(get_db)], limit: int = 50):
     events = (
         db.query(LoginEvent)
         .order_by(LoginEvent.id.desc())
@@ -804,7 +804,7 @@ def list_events(limit: int = 50, db: Session = Depends(get_db)):
 
 
 @app.get("/mitigations")
-def list_mitigations(limit: int = 50, db: Session = Depends(get_db)):
+def list_mitigations(db: Annotated[Session, Depends(get_db)],limit: int = 50):
     items = (
         db.query(MitigationLog)
         .order_by(MitigationLog.id.desc())
@@ -825,7 +825,7 @@ def list_mitigations(limit: int = 50, db: Session = Depends(get_db)):
 
 
 @app.post("/events/clear")
-def clear_events(seed: bool = True, db: Session = Depends(get_db)):
+def clear_events(db: Annotated[Session, Depends(get_db)],seed: bool = True):
     db.query(LoginEvent).delete()
     db.query(MitigationLog).delete()
     if seed:
