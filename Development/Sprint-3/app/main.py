@@ -29,6 +29,8 @@ from .simulator import (
     simulate_uc_019,
 )
 
+BASE_URL = "http://localhost:8000"
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="ALDS Sprint 3")
@@ -853,43 +855,43 @@ def stop_traffic():
 
 @app.post("/simulate/uc-012")
 def trigger_uc_012(background_tasks: BackgroundTasks):
-    background_tasks.add_task(simulate_uc_012, "http://localhost:8000")
+    background_tasks.add_task(simulate_uc_012, BASE_URL)
     return {"status": "started", "uc": "UC-012"}
 
 
 @app.post("/simulate/uc-013")
 def trigger_uc_013(background_tasks: BackgroundTasks):
-    background_tasks.add_task(simulate_uc_013, "http://localhost:8000")
+    background_tasks.add_task(simulate_uc_013, BASE_URL)
     return {"status": "started", "uc": "UC-013"}
 
 
 @app.post("/simulate/uc-014")
 def trigger_uc_014(background_tasks: BackgroundTasks):
-    background_tasks.add_task(simulate_uc_014, "http://localhost:8000")
+    background_tasks.add_task(simulate_uc_014, BASE_URL)
     return {"status": "started", "uc": "UC-014"}
 
 
 @app.post("/simulate/uc-015")
 def trigger_uc_015(background_tasks: BackgroundTasks):
-    background_tasks.add_task(simulate_uc_015, "http://localhost:8000")
+    background_tasks.add_task(simulate_uc_015, BASE_URL)
     return {"status": "started", "uc": "UC-015"}
 
 
 @app.post("/simulate/uc-016")
 def trigger_uc_016(background_tasks: BackgroundTasks):
-    background_tasks.add_task(simulate_uc_016, "http://localhost:8000")
+    background_tasks.add_task(simulate_uc_016, BASE_URL)
     return {"status": "started", "uc": "UC-016"}
 
 
 @app.post("/simulate/uc-018")
 def trigger_uc_018(background_tasks: BackgroundTasks):
-    background_tasks.add_task(simulate_uc_018, "http://localhost:8000")
+    background_tasks.add_task(simulate_uc_018, BASE_URL)
     return {"status": "started", "uc": "UC-018"}
 
 
 @app.post("/simulate/uc-019")
 def trigger_uc_019(background_tasks: BackgroundTasks):
-    background_tasks.add_task(simulate_uc_019, "http://localhost:8000")
+    background_tasks.add_task(simulate_uc_019, BASE_URL)
     return {"status": "started", "uc": "UC-019"}
 
 
