@@ -1,0 +1,1 @@
+{"uc_id": "UC-019", "event": "containment_required", "action": "containment_ticket_create", "status": "success", "timestamp": "2026-03-07T21:22:41.640847+00:00", "details": {"ticket_id": "CT-20260307212241-0001", "entity": "svc-account-demo", "severity": "critical"}}
