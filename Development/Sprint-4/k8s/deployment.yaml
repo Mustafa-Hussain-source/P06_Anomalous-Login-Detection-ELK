@@ -13,10 +13,20 @@ spec:
       labels:
         app: alds-api
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: alds-api
-          image: alds-sprint3-api:latest
+          image: alds-sprint3-api:v1.0
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+              ephemeral-storage: "1Gi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+              ephemeral-storage: "2Gi"
           ports:
             - containerPort: 8000
           envFrom:

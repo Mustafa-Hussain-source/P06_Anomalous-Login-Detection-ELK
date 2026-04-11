@@ -1,21 +1,13 @@
-Project: Anomalous Login Detection System (ALDS) - P06
+### Project: Anomalous Login Detection System (ALDS) - P06
 Code: P06
 
 Team: Names and IDs of Team Members
 - Muhammad Aaffan Khan Niazi - 26100015
-- Mustafa Hussain - <ID_PENDING>
-- Team Member 3 - <ID_PENDING>
-- Team Member 4 - <ID_PENDING>
-- Team Member 5 - <ID_PENDING>
+- Mustafa Hussain - 26100399
+- Shehroz Faryad - 25100022
+- Mohammad Mustafa - 26100286
 
-SPRINT-4 SUBMISSION GUIDELINES
-
-1. This "Readme" file is uploaded in the Sprint-4 folder.
-2. Submission details are followed from the Project Deadlines document.
-
-------------------------------------------------------------------------------------------------
-
-LIST OF REQUIREMENTS COMPLETED IN THE SPRINT
+### LIST OF REQUIREMENTS COMPLETED IN THE SPRINT
 
 Completed Use Cases:
 - UC-016: Auto-Revoke Compromised API Keys
@@ -24,16 +16,32 @@ Completed Use Cases:
   Developer: Muhammad Aaffan Khan Niazi
 - UC-019: Automated Containment Ticket Creation
   Developer: Muhammad Aaffan Khan Niazi
+- UC-024: Login Attempt from Blocked Geographic Region
+  Developer: Shehroz Faryad
+- UC-023: Password Spray Attack Detection & Temporary Access Restriction
+  Developer: Shehroz Faryad
+- UC-020: IPS Rollback on False Positives
+  Developer: Mohammad Mustafa
+- UC-022: Parallel Full Stack Admin Dashboard
+  Developer: Mohammad Mustafa
+- UC-017: Auto-Disable VPN Access on Suspected Compromise
+  Developer: Mustafa Hussain
 
 Implemented artifacts:
 - UC automation engine: `Development/Sprint-4/uc_automation.py`
 - System tests for UC automation: `Development/Sprint-4/test_uc_automation.py`
 - Sprint-4 test cases file: `Development/Sprint-4/ALDS_Test_Cases_10UC.xlsx`
 - Mitigation evidence logs: `Development/Sprint-4/artifacts/*.jsonl`
+- Wazuh custom detection rules: `wazuh-docker/single-node/config/wazuh_manager/local_rules.xml`
+- Logstash enrichment pipeline (GeoIP simulation): `elk-bridge/logstash/pipeline/wazuh.conf`
+- ELK stack deployment: `elk-bridge/docker-compose.elk.yml`
+- Test environment: Victim VM (Linux Mint with Wazuh agent) / Attacker VM (VPN-enabled for simulation)
+- Attack simulation tools: Hydra (password spray simulation) SSH (manual failed login attempts)
+
 
 ------------------------------------------------------------------------------------------------
 
-HOW TO ACCESS THE SYSTEM
+### HOW TO ACCESS THE SYSTEM
 
 Option 1: Run Sprint-4 UC automation locally
 1. Open terminal in `Development/Sprint-4`.
@@ -58,9 +66,68 @@ Credentials:
 - No default user credentials are required for the local Sprint-4 UC simulation scripts.
 - If deployed service credentials are needed for live infra, use the team deployment secrets file (not committed to repository).
 
+
 ------------------------------------------------------------------------------------------------
 
-ADDITIONAL INFORMATION
+### HOW TO ACCESS THE SYSTEM (For UC-017 and UC-020)
+
+Option 1: Run ELK Stack
+
+Navigate to: elk-bridge
+Run: docker compose -f docker-compose.elk.yml up -d
+
+Ensure Wazuh manager is running separately from:
+wazuh-docker/single-node
+
+Option 2: Generate Attack Events
+
+Password Spray Simulation:
+hydra -L users.txt -p wrongpassword ssh://192.168.56.104 -t 4
+
+Manual Failed Login:
+ssh user1@192.168.56.104
+
+Option 3: View Detection in Kibana
+
+Open: http://localhost:5602
+Go to Discover → wazuh-alerts-*
+
+Example Queries:
+
+Blocked Country Use Case:
+use_case.name : "Blocked Country Login Attempt"
+
+Password Spray Use Case:
+rule.id : "100210"
+
+Combined Filter (Demo):
+rule.id : "5760" and simulated_geo.policy : "blocked_country"
+
+Evidence Output:
+Wazuh alerts log:
+/var/ossec/logs/alerts/alerts.json
+Elasticsearch index:
+wazuh-alerts-*
+Enriched fields include:
+simulated_geo.country_name
+simulated_geo.policy
+use_case.name
+tags
+
+Credentials:
+
+No default credentials required for simulation.
+Test users created on victim VM (e.g., user1, user2).
+
+
+GeoIP functionality is simulated using Logstash enrichment due to lab environment constraints.
+Active Response is configured for temporary containment instead of permanent blocking.
+The system demonstrates a full pipeline: detection (Wazuh), enrichment (Logstash), visualization (Kibana), and response (Active Response).
+
+
+------------------------------------------------------------------------------------------------
+
+### ADDITIONAL INFORMATION
 
 - Sprint-4 secure coding/threat-modeling evidence is included in:
   `Development/Sprint-4/P06_Secure Coding-Threat Modeling_Sprint4.docx`
