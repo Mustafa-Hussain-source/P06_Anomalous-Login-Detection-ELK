@@ -78,7 +78,7 @@ if ($ApplyWazuhWiring) {
 }
 
 $demoVerifyOk = Invoke-Step -Name "Core IPS verification" -Action {
-    & (Join-Path $projectRoot "scripts\demo_verify.ps1")
+    & (Join-Path $projectRoot "scripts\demo_verify.ps1") -BaseUrl $BaseUrl
     if ($LASTEXITCODE -ne 0) {
         throw "demo_verify.ps1 exited with code $LASTEXITCODE"
     }

@@ -1,0 +1,148 @@
+{
+  "generated_at": "2026-04-06T13:13:33.743184+00:00",
+  "base_url": "http://127.0.0.1:8010",
+  "summary": {
+    "total_checks": 13,
+    "passed": 13,
+    "failed": 0
+  },
+  "checks": [
+    {
+      "uc_id": "UC-012",
+      "action": "account_lock",
+      "passed": true,
+      "detail": "found=2"
+    },
+    {
+      "uc_id": "UC-013",
+      "action": "ip_block",
+      "passed": true,
+      "detail": "found=1"
+    },
+    {
+      "uc_id": "UC-014",
+      "action": "session_kill",
+      "passed": true,
+      "detail": "found=1"
+    },
+    {
+      "uc_id": "UC-015",
+      "action": "mfa_stepup",
+      "passed": true,
+      "detail": "found=1"
+    },
+    {
+      "uc_id": "UC-016",
+      "action": "api_key_revoke",
+      "passed": true,
+      "detail": "found=1"
+    },
+    {
+      "uc_id": "UC-017",
+      "action": "region_block",
+      "passed": true,
+      "detail": "found=2"
+    },
+    {
+      "uc_id": "UC-018",
+      "action": "admin_console_block",
+      "passed": true,
+      "detail": "found=1"
+    },
+    {
+      "uc_id": "UC-019",
+      "action": "containment_ticket_create",
+      "passed": true,
+      "detail": "found=4"
+    },
+    {
+      "uc_id": "UC-020",
+      "action": "temporary_access_restriction",
+      "passed": true,
+      "detail": "found=4"
+    },
+    {
+      "uc_id": "UC-008",
+      "action": "triage_update",
+      "passed": true,
+      "detail": "event_id=90"
+    },
+    {
+      "uc_id": "UC-009",
+      "action": "containment_ticket_lifecycle",
+      "passed": true,
+      "detail": "ticket_id=2"
+    },
+    {
+      "uc_id": "UC-010",
+      "action": "detection_rule_tuning",
+      "passed": true,
+      "detail": "rule_id=1"
+    },
+    {
+      "uc_id": "UC-006",
+      "action": "specification_traceability",
+      "passed": true,
+      "detail": "Documented/manual validation in sprint gate docs"
+    }
+  ],
+  "artifacts": {
+    "events_count": 90,
+    "mitigations_count": 17,
+    "evidence_count": 160,
+    "cases_count": 0,
+    "tickets_count": 2,
+    "kpi": {
+      "total_events": 90,
+      "suspicious_events": 38,
+      "blocked_events": 13,
+      "mitigations": 17,
+      "avg_risk": 39.53,
+      "mttd_seconds": 18,
+      "mttr_seconds": 91,
+      "false_positive_rate": 0.06
+    },
+    "weekly_report": {
+      "generated_at": "2026-04-06T18:13:33.641952+05:00",
+      "events_total": 90,
+      "mitigations_total": 17,
+      "events_by_action": {
+        "login_success": 52,
+        "login_failure": 19,
+        "account_locked_block": 11,
+        "ip_blacklist_block": 1,
+        "device_fingerprint_change": 1,
+        "mfa_challenge_required": 2,
+        "blocked_country_login_attempt": 1,
+        "temporary_access_restriction": 3
+      },
+      "mitigations_by_uc": {
+        "UC-012": 2,
+        "UC-013": 1,
+        "UC-014": 1,
+        "UC-019": 4,
+        "UC-015": 1,
+        "UC-016": 1,
+        "UC-017": 2,
+        "UC-018": 1,
+        "UC-020": 4
+      }
+    },
+    "export_snapshot_sizes": {
+      "events": 90,
+      "mitigations": 17
+    },
+    "graph_sizes": {
+      "nodes": 139,
+      "edges": 90
+    },
+    "health": {
+      "status": "healthy",
+      "pipeline": "operational",
+      "event_count": 90,
+      "mitigation_count": 17,
+      "restriction_count": 1,
+      "last_checked": "2026-04-06T18:13:33.707999+05:00"
+    }
+  }
+}

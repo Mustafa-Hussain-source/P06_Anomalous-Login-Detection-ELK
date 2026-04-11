@@ -1,0 +1,80 @@
+{
+  "generated_at": "2026-04-06T13:20:10.730521+00:00",
+  "backend_url": "http://127.0.0.1:8010",
+  "frontend_url": "http://127.0.0.1:4173",
+  "summary": {
+    "total_checks": 4,
+    "passed": 4,
+    "failed": 0
+  },
+  "checks": [
+    {
+      "name": "frontend_served",
+      "passed": true,
+      "detail": "status=200 length=465"
+    },
+    {
+      "name": "backend_ingestion_health",
+      "passed": true,
+      "detail": "status=healthy"
+    },
+    {
+      "name": "backend_kpi_payload",
+      "passed": true,
+      "detail": "keys=['avg_risk', 'blocked_events', 'false_positive_rate', 'mitigations', 'mttd_seconds']"
+    },
+    {
+      "name": "backend_weekly_payload",
+      "passed": true,
+      "detail": "events_total=65"
+    }
+  ],
+  "snapshots": {
+    "frontend": {
+      "url": "http://127.0.0.1:4173",
+      "status_code": 200,
+      "content_length": 465,
+      "has_root_div": true
+    },
+    "ingestion_health": {
+      "url": "http://127.0.0.1:8010/ingestion/health",
+      "status_code": 200,
+      "json": {
+        "status": "healthy",
+        "pipeline": "operational",
+        "event_count": 65,
+        "mitigation_count": 0,
+        "restriction_count": 0,
+        "last_checked": "2026-04-06T18:20:10.695704+05:00"
+      }
+    },
+    "kpi": {
+      "url": "http://127.0.0.1:8010/analytics/kpi",
+      "status_code": 200,
+      "json": {
+        "total_events": 65,
+        "suspicious_events": 13,
+        "blocked_events": 0,
+        "mitigations": 0,
+        "avg_risk": 20.0,
+        "mttd_seconds": 18,
+        "mttr_seconds": 91,
+        "false_positive_rate": 0.06
+      }
+    },
+    "weekly_report": {
+      "url": "http://127.0.0.1:8010/reports/weekly",
+      "status_code": 200,
+      "json": {
+        "generated_at": "2026-04-06T18:20:10.728701+05:00",
+        "events_total": 65,
+        "mitigations_total": 0,
+        "events_by_action": {
+          "login_success": 52,
+          "login_failure": 13
+        },
+        "mitigations_by_uc": {}
+      }
+    }
+  }
+}

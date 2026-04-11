@@ -140,6 +140,17 @@ def simulate_uc_016(base_url: str, username: str | None = None) -> None:
     )
 
 
+def simulate_uc_017(base_url: str, username: str | None = None) -> None:
+    target = username or "Blocked Region Tester"
+    _post_login(
+        base_url,
+        username=target,
+        password="password123",
+        ip="203.0.113.17",
+        country="IR",
+    )
+
+
 def simulate_uc_018(base_url: str, username: str | None = None) -> None:
     target = username or SPRINT4_ADMIN_USER
     _post_login(
@@ -157,4 +168,24 @@ def simulate_uc_019(base_url: str, username: str | None = None) -> None:
         username=target,
         password="wrong-password",
         containment_entity="ip:185.93.50.10",
+    )
+
+
+def simulate_uc_020(base_url: str, username: str | None = None) -> None:
+    target = username or "Password Spray Tester"
+    source_ip = "203.0.113.20"
+    for idx in range(6):
+        _post_login(
+            base_url,
+            username=f"{target}-{idx}",
+            password="wrong-password",
+            ip=source_ip,
+            country="PK",
+        )
+    _post_login(
+        base_url,
+        username=f"{target}-final",
+        password="password123",
+        ip=source_ip,
+        country="PK",
     )
