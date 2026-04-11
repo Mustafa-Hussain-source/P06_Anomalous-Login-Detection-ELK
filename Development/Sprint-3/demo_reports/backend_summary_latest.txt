@@ -1,83 +1,89 @@
 ﻿ALDS SPRINT 3 - BACKEND DEMO SUMMARY
 Report Type : Backend Security Evidence
-Generated At: 2026-02-24 20:02:21 +05:00
-Source API  : http://localhost:8000
+Generated At: 2026-04-06 18:36:55 +05:00
+Source API  : http://127.0.0.1:8010
 Sample Size : events=300, mitigations=300
 
 --------------------------------------------------------------------------------
 SNAPSHOT
 --------------------------------------------------------------------------------
-- Total events fetched: 83
-- Total mitigations fetched: 8
+- Total events fetched: 99
+- Total mitigations fetched: 23
 - Blocking evidence events (top 20 scanned): 17
 
 --------------------------------------------------------------------------------
 EVENT ACTION COUNTS
 --------------------------------------------------------------------------------
 login_success                    :    53
-login_failure                    :    13
+login_failure                    :    17
 account_locked_block             :    11
+temporary_access_restriction     :    10
 mfa_challenge_required           :     3
 ip_blacklist_block               :     2
+blocked_country_login_attempt    :     2
 geofence_violation               :     1
 
 --------------------------------------------------------------------------------
 MITIGATION ACTION COUNTS
 --------------------------------------------------------------------------------
+temporary_access_restriction     :    11
 ip_block                         :     4
+region_block                     :     3
 account_lock                     :     2
-mfa_stepup                       :     1
+mfa_stepup                       :     2
 session_kill                     :     1
 
 --------------------------------------------------------------------------------
 LATEST BLOCKING EVIDENCE (TOP 20)
 --------------------------------------------------------------------------------
 timestamp                 username               ip_address         event_action                 risk
-2026-02-24T20:02:10.539981+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
-2026-02-24T20:02:08.456452+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
-2026-02-24T20:02:06.390258+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
-2026-02-24T20:02:04.308748+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
-2026-02-24T20:02:02.190135+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
-2026-02-24T20:02:00.111549+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
-2026-02-24T20:01:58.270941+05:00 Impossible Travel Tester 81.2.69.88         mfa_challenge_required         95
-2026-02-24T20:01:58.042668+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
-2026-02-24T20:01:55.963566+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
-2026-02-24T20:01:55.208442+05:00 Impossible Travel Tester 127.0.0.1          mfa_challenge_required         75
-2026-02-24T20:01:55.176174+05:00 Impossible Travel Tester 91.65.88.88        mfa_challenge_required         75
-2026-02-24T20:01:53.924901+05:00 Russian Threat Actor   5.255.255.1        ip_blacklist_block             95
-2026-02-24T20:01:53.874401+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
-2026-02-24T20:01:53.070308+05:00 geo.demo               5.255.255.1        ip_blacklist_block             95
-2026-02-24T20:01:52.958793+05:00 geo.demo               198.51.7.217       geofence_violation             85
-2026-02-24T20:01:51.811450+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
-2026-02-24T20:01:51.790315+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
+2026-04-06T18:36:50.380827+05:00 Impossible Travel Tester 127.0.0.1          mfa_challenge_required         75
+2026-04-06T18:36:49.435711+05:00 Impossible Travel Tester 91.65.88.88        mfa_challenge_required         95
+2026-04-06T18:36:48.366168+05:00 Impossible Travel Tester 1.120.30.88        mfa_challenge_required         75
+2026-04-06T18:36:48.280068+05:00 geo.demo               5.255.255.1        ip_blacklist_block             95
+2026-04-06T18:36:48.186567+05:00 Russian Threat Actor   198.51.181.81      geofence_violation             85
+2026-04-06T18:36:47.134945+05:00 Russian Threat Actor   5.255.255.1        ip_blacklist_block             95
+2026-04-06T18:36:47.067879+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
+2026-04-06T18:36:45.500877+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
+2026-04-06T18:36:45.447242+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
+2026-04-06T18:36:45.397595+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
+2026-04-06T18:36:45.348433+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
+2026-04-06T18:36:45.297672+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
+2026-04-06T18:36:45.249494+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
+2026-04-06T18:36:45.190588+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
+2026-04-06T18:36:45.147816+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
+2026-04-06T18:36:45.098235+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
+2026-04-06T18:36:45.042183+05:00 Malicious Entity       127.0.0.1          account_locked_block           95
 
 --------------------------------------------------------------------------------
 LATEST EVENTS (TOP 10)
 --------------------------------------------------------------------------------
 timestamp                 username               event_action               suspicious   country 
-2026-02-24T20:02:10.539981+05:00 Malicious Entity       account_locked_block       True         PK      
-2026-02-24T20:02:08.456452+05:00 Malicious Entity       account_locked_block       True         PK      
-2026-02-24T20:02:06.390258+05:00 Malicious Entity       account_locked_block       True         PK      
-2026-02-24T20:02:04.308748+05:00 Malicious Entity       account_locked_block       True         PK      
-2026-02-24T20:02:02.190135+05:00 Malicious Entity       account_locked_block       True         PK      
-2026-02-24T20:02:00.111549+05:00 Malicious Entity       account_locked_block       True         PK      
-2026-02-24T20:01:58.270941+05:00 Impossible Travel Tester mfa_challenge_required     True         GB      
-2026-02-24T20:01:58.042668+05:00 Malicious Entity       account_locked_block       True         PK      
-2026-02-24T20:01:55.963566+05:00 Malicious Entity       account_locked_block       True         PK      
-2026-02-24T20:01:55.208442+05:00 Impossible Travel Tester mfa_challenge_required     True         PK      
+2026-04-06T18:36:54.013997+05:00 password.spray.victim  temporary_access_restriction True         PK      
+2026-04-06T18:36:53.946697+05:00 password.spray.seed.6  temporary_access_restriction True         PK      
+2026-04-06T18:36:53.876511+05:00 password.spray.seed.5  temporary_access_restriction True         PK      
+2026-04-06T18:36:53.807896+05:00 password.spray.seed.4  temporary_access_restriction True         PK      
+2026-04-06T18:36:53.739697+05:00 password.spray.seed.3  temporary_access_restriction True         PK      
+2026-04-06T18:36:53.672064+05:00 password.spray.seed.2  temporary_access_restriction True         PK      
+2026-04-06T18:36:53.601357+05:00 password.spray.seed.1  temporary_access_restriction True         PK      
+2026-04-06T18:36:51.930563+05:00 Password Spray Tester-final temporary_access_restriction True         PK      
+2026-04-06T18:36:51.867746+05:00 Password Spray Tester-5 temporary_access_restriction True         PK      
+2026-04-06T18:36:51.799683+05:00 Password Spray Tester-4 temporary_access_restriction True         PK      
 
 --------------------------------------------------------------------------------
 LATEST MITIGATIONS (TOP 10)
 --------------------------------------------------------------------------------
 timestamp                 uc_id    target_identifier        action             status    
-2026-02-24T20:02:20.261683+05:00 UC-015   DemoMfaUser              mfa_stepup         success   
-2026-02-24T20:02:19.597089+05:00 UC-014   1                        session_kill       success   
-2026-02-24T20:02:18.943291+05:00 UC-013   198.51.100.200           ip_block           success   
-2026-02-24T20:02:18.234846+05:00 UC-012   DemoLockUser             account_lock       success   
-2026-02-24T20:01:53.938583+05:00 UC-013   5.255.255.1              ip_block           blocked   
-2026-02-24T20:01:53.085734+05:00 UC-013   5.255.255.1              ip_block           blocked   
-2026-02-24T20:01:52.975330+05:00 UC-013   198.51.7.217             ip_block           blocked   
-2026-02-24T20:01:51.809566+05:00 UC-012   Malicious Entity         account_lock       blocked   
+2026-04-06T18:36:55.167517+05:00 UC-015   DemoMfaUser              mfa_stepup         success   
+2026-04-06T18:36:54.975601+05:00 UC-014   1                        session_kill       success   
+2026-04-06T18:36:54.784592+05:00 UC-013   198.51.100.200           ip_block           success   
+2026-04-06T18:36:54.582248+05:00 UC-012   DemoLockUser             account_lock       success   
+2026-04-06T18:36:54.026015+05:00 UC-020   203.0.113.20             temporary_access_restriction restricted
+2026-04-06T18:36:53.959042+05:00 UC-020   203.0.113.20             temporary_access_restriction restricted
+2026-04-06T18:36:53.888819+05:00 UC-020   203.0.113.20             temporary_access_restriction restricted
+2026-04-06T18:36:53.819392+05:00 UC-020   203.0.113.20             temporary_access_restriction restricted
+2026-04-06T18:36:53.750915+05:00 UC-020   203.0.113.20             temporary_access_restriction restricted
+2026-04-06T18:36:53.684904+05:00 UC-020   203.0.113.20             temporary_access_restriction restricted
 
 --------------------------------------------------------------------------------
 DEMO INTERPRETATION

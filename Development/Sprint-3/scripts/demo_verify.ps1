@@ -85,6 +85,29 @@ function Invoke-ApiJson {
     }
 }
 
+function Resolve-ApiBaseUrl {
+    param([string]$Requested)
+
+    $candidates = @($Requested, "http://localhost:8001", "http://127.0.0.1:8001", "http://localhost:8000", "http://127.0.0.1:8000") |
+        Where-Object { $_ -and $_.Trim() -ne "" } |
+        Select-Object -Unique
+
+    foreach ($candidate in $candidates) {
+        try {
+            $ping = Invoke-ApiJson -Method "GET" -Url "$candidate/openapi.json"
+            if ($ping.StatusCode -eq 200) {
+                return $candidate
+            }
+        } catch {
+            continue
+        }
+    }
+
+    return $Requested
+}
+
+$BaseUrl = Resolve-ApiBaseUrl -Requested $BaseUrl
+
 Write-Info "Checking API health at $BaseUrl/openapi.json"
 $docs = Invoke-ApiJson -Method "GET" -Url "$BaseUrl/openapi.json"
 Assert-True ($docs.StatusCode -eq 200) "API is reachable" "API is not reachable"
@@ -151,7 +174,7 @@ Start-Sleep -Seconds 1
 $geoIp = "198.51." + (Get-Random -Minimum 1 -Maximum 254) + "." + (Get-Random -Minimum 1 -Maximum 254)
 
 $geofenceAttempt = Invoke-ApiJson -Method "POST" -Url "$BaseUrl/login" -Body @{
-    username = "geo.demo"
+    username = "Russian Threat Actor"
     password = "password123"
     user_agent = "demo_verify"
 } -Headers @{
@@ -182,6 +205,49 @@ $mfaAttempt = Invoke-ApiJson -Method "POST" -Url "$BaseUrl/login" -Body @{
 }
 Assert-True (($mfaAttempt.StatusCode -eq 200) -and (-not $mfaAttempt.Body.success) -and ($mfaAttempt.Body.message -eq "mfa required")) "MFA-required policy enforced" "MFA-required policy not enforced"
 
+Write-Info "Triggering UC-017 blocked country simulation"
+$uc017 = Invoke-ApiJson -Method "POST" -Url "$BaseUrl/simulate/uc-017"
+Assert-True ($uc017.StatusCode -eq 200) "UC-017 simulation started" "UC-017 simulation did not start"
+Start-Sleep -Seconds 1
+
+$blockedCountryAttempt = Invoke-ApiJson -Method "POST" -Url "$BaseUrl/login" -Body @{
+    username = "blocked.country.demo"
+    password = "password123"
+    user_agent = "demo_verify"
+} -Headers @{
+    "X-Forwarded-For" = "203.0.113.17"
+    "X-Country" = "IR"
+}
+Assert-True (($blockedCountryAttempt.StatusCode -eq 200) -and (-not $blockedCountryAttempt.Body.success) -and ($blockedCountryAttempt.Body.message -eq "blocked country")) "UC-017 blocked country policy enforced" "UC-017 blocked country policy not enforced"
+
+Write-Info "Triggering UC-020 password spray simulation"
+$uc020 = Invoke-ApiJson -Method "POST" -Url "$BaseUrl/simulate/uc-020"
+Assert-True ($uc020.StatusCode -eq 200) "UC-020 simulation started" "UC-020 simulation did not start"
+Start-Sleep -Seconds 2
+
+# Deterministic UC-020 setup: generate spray attempts from the same IP so the next login is restricted.
+$sprayIp = "203.0.113.20"
+for ($i = 1; $i -le 6; $i++) {
+    $null = Invoke-ApiJson -Method "POST" -Url "$BaseUrl/login" -Body @{
+        username = "password.spray.seed.$i"
+        password = "wrong-password"
+        user_agent = "demo_verify"
+    } -Headers @{
+        "X-Forwarded-For" = $sprayIp
+        "X-Country" = "PK"
+    }
+}
+
+$tempRestrictionAttempt = Invoke-ApiJson -Method "POST" -Url "$BaseUrl/login" -Body @{
+    username = "password.spray.victim"
+    password = "password123"
+    user_agent = "demo_verify"
+} -Headers @{
+    "X-Forwarded-For" = $sprayIp
+    "X-Country" = "PK"
+}
+Assert-True (($tempRestrictionAttempt.StatusCode -eq 200) -and (-not $tempRestrictionAttempt.Body.success) -and ($tempRestrictionAttempt.Body.message -eq "temporary restriction applied")) "UC-020 temporary access restriction enforced" "UC-020 temporary access restriction not enforced"
+
 $events = Invoke-ApiJson -Method "GET" -Url "$BaseUrl/events?limit=200"
 $mitigations = Invoke-ApiJson -Method "GET" -Url "$BaseUrl/mitigations?limit=200"
 
@@ -192,9 +258,13 @@ if ($events.Body) {
 
 $hasIpBlockEvent = $eventActions -contains "ip_blacklist_block"
 $hasMfaEvent = $eventActions -contains "mfa_challenge_required"
+$hasBlockedCountryEvent = $eventActions -contains "blocked_country_login_attempt"
+$hasTempRestrictionEvent = $eventActions -contains "temporary_access_restriction"
 
 Assert-True $hasIpBlockEvent "Evidence includes ip_blacklist_block event" "Missing ip_blacklist_block event evidence"
 Assert-True $hasMfaEvent "Evidence includes mfa_challenge_required event" "Missing mfa_challenge_required event evidence"
+Assert-True $hasBlockedCountryEvent "Evidence includes blocked_country_login_attempt event" "Missing blocked_country_login_attempt event evidence"
+Assert-True $hasTempRestrictionEvent "Evidence includes temporary_access_restriction event" "Missing temporary_access_restriction event evidence"
 Assert-True (($mitigations.StatusCode -eq 200) -and ($mitigations.Body.Count -ge 1)) "Mitigation log populated" "Mitigation log is empty or unavailable"
 
 Write-Host ""
