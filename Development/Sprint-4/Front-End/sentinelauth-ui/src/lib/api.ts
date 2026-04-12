@@ -22,8 +22,10 @@ import type {
   WeeklyReport,
 } from '../types'
 
-const DEFAULT_API_BASE = 'http://localhost:8000'
+const DEFAULT_API_BASE = 'http://localhost:8001'
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || DEFAULT_API_BASE
+
+console.log("API BASE:", API_BASE)
 
 class ApiError extends Error {
   status: number

@@ -1,33 +1,41 @@
 name: ci-cd
 
+# 🔹 Triggers: runs on pushes, PRs, and manual runs
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev"]
   pull_request:
-    branches: ["main", "master"]
+    branches: ["main", "master", "dev"]
   workflow_dispatch:
 
+# 🔹 Minimal permissions for security
 permissions:
   contents: read
 
+# 🔹 Prevent multiple runs on same branch from stacking
 concurrency:
   group: ci-cd-${{ github.ref }}
   cancel-in-progress: true
 
+# 🔹 Global environment variables
 env:
   PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
 
+###########################################################
+# 🧠 JOB 1: Python + Backend + Sonar Checks
+###########################################################
 jobs:
   python-checks:
     name: Python Checks + Sonar
     runs-on: ubuntu-latest
 
     steps:
-      # 🔹 Checkout code
+      # 🔹 Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0   # Needed for Sonar
 
       # 🔹 Setup Python
       - name: Set up Python
@@ -38,44 +46,38 @@ jobs:
           cache-dependency-path: Development/Sprint-3/requirements.txt
 
       # 🔹 Install dependencies
-      - name: Install dependencies
+      - name: Install Python dependencies
         working-directory: Development/Sprint-3
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install coverage pytest
 
-      # 🔹 Syntax check Sprint-3
+      # 🔹 Syntax check Sprint-3 backend
       - name: Syntax check Sprint-3 backend
         working-directory: Development/Sprint-3
         run: python -m compileall app
 
-      # 🔹 Syntax check Sprint-4
-      - name: Syntax check Sprint-4
+      # 🔹 Syntax check Sprint-4 automation scripts
+      - name: Syntax check Sprint-4 automation
         working-directory: Development/Sprint-4
         run: python -m compileall uc_automation.py test_uc_automation.py
 
-      # 🔹 Install coverage tool
-      - name: Install coverage
-        run: pip install coverage
-
       # 🔹 Run tests with coverage
-      - name: Run tests with coverage
+      - name: Run Sprint-4 tests with coverage
         working-directory: Development/Sprint-4
         run: |
           coverage run -m unittest test_uc_automation.py
-          coverage xml
+          coverage xml -o coverage.xml
 
-      # 🔹 Debug (optional but helpful)
-      - name: Verify coverage file exists
-        run: ls -R Development/Sprint-4
-
-      # 🔹 Dependency check
+      # 🔹 Verify dependencies are consistent
       - name: Dependency check
         working-directory: Development/Sprint-3
         run: python -m pip check
 
-      # 🔹 SonarCloud Scan (NOW WORKS CORRECTLY)
+      # 🔹 SonarCloud scan (only when safe)
       - name: SonarCloud Scan
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         uses: SonarSource/sonarqube-scan-action@v6
         with:
           args: >
@@ -84,145 +86,103 @@ jobs:
           SONAR_HOST_URL: https://sonarcloud.io
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  docker-build:
-    name: Docker Build Validation
+###########################################################
+# 🎨 JOB 2: Frontend (React + Vite) Checks
+###########################################################
+  frontend-checks:
+    name: Frontend Checks
     runs-on: ubuntu-latest
-    needs: python-checks
+
+    defaults:
+      run:
+        working-directory: Development/Sprint-4/Front-End
 
     steps:
+      # 🔹 Checkout repo
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 🔹 Setup Node
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: Development/Sprint-4/Front-End/package-lock.json
+
+      # 🔹 Install dependencies
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # 🔹 Lint code
+      - name: Lint frontend
+        run: npm run lint
+
+      # 🔹 Run tests (Vitest)
+      - name: Run frontend tests
+        run: npm run test:run
+
+      # 🔹 Build frontend
+      - name: Build frontend
+        run: npm run build
+
+###########################################################
+# 🔐 JOB 3: Security Config Checks (Wazuh + Docker + K8s)
+###########################################################
+  security-config-checks:
+    name: Security Config Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      # 🔹 Checkout repo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 🔹 Install validation tools
+      - name: Install validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxml2-utils yamllint
+
+      # 🔹 Validate Wazuh XML rules
+      - name: Validate Wazuh XML
+        run: |
+          xmllint --noout Development/Sprint-3/wazuh/rules.xml
+
+      # 🔹 Validate Docker Compose config (critical for runtime)
+      - name: Validate Docker Compose
+        working-directory: Development/Sprint-3/elk-wazuh-compose
+        run: |
+          docker compose config > /tmp/compose-rendered.yml
+          test -s /tmp/compose-rendered.yml
+
+      # 🔹 Lint Kubernetes manifests (future deployment readiness)
+      - name: Lint Kubernetes YAML
+        run: |
+          yamllint Development/Sprint-4/k8s
+
+###########################################################
+# 🐳 JOB 4: Docker Build Validation
+###########################################################
+  docker-build:
+    name: Docker Build Validation
+    runs-on: ubuntu-latest
+
+    # 🔹 Only run if all previous jobs pass
+    needs:
+      - python-checks
+      - frontend-checks
+      - security-config-checks
+
+    steps:
+      # 🔹 Checkout repo
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 🔹 Build API container
       - name: Build Sprint-3 API image
         run: |
           docker build \
             -f Development/Sprint-3/Dockerfile \
             -t alds-sprint3-api:ci \
             Development/Sprint-3
-
-# name: ci-cd
-
-# on:
-#   push:
-#     branches: ["main", "master"]
-#   pull_request:
-#     branches: ["main", "master"]
-#   workflow_dispatch:
-
-# permissions:
-#   contents: read
-
-# concurrency:
-#   group: ci-cd-${{ github.ref }}
-#   cancel-in-progress: true
-
-# env:
-#   PYTHON_VERSION: "3.12"
-
-# jobs:
-#   python-checks:
-#     name: Python Checks
-#     runs-on: ubuntu-latest
-
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v4
-
-#       - name: Set up Python
-#         uses: actions/setup-python@v5
-#         with:
-#           python-version: ${{ env.PYTHON_VERSION }}
-#           cache: pip
-#           cache-dependency-path: Development/Sprint-3/requirements.txt
-
-#       - name: Install dependencies
-#         working-directory: Development/Sprint-3
-#         run: |
-#           python -m pip install --upgrade pip
-#           python -m pip install -r requirements.txt
-
-#       - name: Syntax check Sprint-3 backend
-#         working-directory: Development/Sprint-3
-#         run: python -m compileall app
-
-#       - name: Syntax check Sprint-4
-#         working-directory: Development/Sprint-4
-#         run: python -m compileall uc_automation.py test_uc_automation.py
-
-#       - name: Run Sprint-4 tests
-#         working-directory: Development/Sprint-4
-#         run: python -m unittest -v test_uc_automation.py
-
-#       - name: Dependency check
-#         working-directory: Development/Sprint-3
-#         run: python -m pip check
-
-#   docker-build:
-#     name: Docker Build Validation
-#     runs-on: ubuntu-latest
-#     needs: python-checks
-
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v4
-
-#       - name: Build Sprint-3 API image
-#         run: |
-#           docker build \
-#             -f Development/Sprint-3/Dockerfile \
-#             -t alds-sprint3-api:ci \
-#             Development/Sprint-3
-
-#   sonarqube:
-#     name: SonarQube Scan
-#     runs-on: ubuntu-latest
-#     needs: python-checks
-#     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
-
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v4
-#         with:
-#           fetch-depth: 0
-
-#       - name: SonarCloud Scan
-#         uses: SonarSource/sonarqube-scan-action@v6
-#         env:
-#           SONAR_HOST_URL: https://sonarcloud.io
-#           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  # sonarqube:
-  #   name: SonarQube Scan
-  #   runs-on: ubuntu-latest
-  #   needs: python-checks
-  #   if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
-
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0
-
-  #     - name: Sonar token precheck
-  #       id: sonar-precheck
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  #       run: |
-  #         if [ -n "$SONAR_TOKEN" ]; then
-  #           echo "enabled=true" >> "$GITHUB_OUTPUT"
-  #         else
-  #           echo "enabled=false" >> "$GITHUB_OUTPUT"
-  #         fi
-
-  #     - name: SonarCloud scan
-  #       if: steps.sonar-precheck.outputs.enabled == 'true'
-  #       uses: SonarSource/sonarqube-scan-action@v6
-  #       env:
-  #         SONAR_HOST_URL: https://sonarcloud.io
-  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-  #     - name: Explain why Sonar scan was skipped
-  #       if: steps.sonar-precheck.outputs.enabled == 'false'
-  #       run: |
-  #         echo "SONAR_TOKEN is not configured."
-  #         echo "Set repository secret SONAR_TOKEN to enable SonarQube scan in CI/CD."
-
