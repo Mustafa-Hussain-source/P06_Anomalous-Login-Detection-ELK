@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any
-
+from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -110,7 +110,7 @@ def _seed_detection_rules(db: Session) -> None:
 
 
 @router.get("/analytics/kpi")
-def analytics_kpi(db: Session = Depends(get_db)):
+def analytics_kpi(db: Annotated[Session, Depends(get_db)]):
     events = db.query(LoginEvent).all()
     mitigations = db.query(MitigationLog).all()
     triage_rows = db.query(EventTriage).all()
@@ -264,7 +264,7 @@ def analytics_kpi(db: Session = Depends(get_db)):
 
 
 @router.get("/analytics/threat-heatmap")
-def analytics_threat_heatmap(db: Session = Depends(get_db)):
+def analytics_threat_heatmap(db: Annotated[Session, Depends(get_db)]):
     rows = (
         db.query(LoginEvent.country, LoginEvent.timestamp)
         .filter(LoginEvent.impossible_travel.is_(True))
@@ -299,7 +299,7 @@ def analytics_threat_heatmap(db: Session = Depends(get_db)):
 
 
 @router.get("/analytics/threat-velocity")
-def analytics_threat_velocity(db: Session = Depends(get_db), hours: int = 12, buckets: int = 12):
+def analytics_threat_velocity(db: Annotated[Session, Depends(get_db)], hours: int = 12, buckets: int = 12):
     """
     Calculate threat ingress velocity over time.
     Groups events into N time buckets over the last M hours.
@@ -387,7 +387,7 @@ def analytics_threat_velocity(db: Session = Depends(get_db), hours: int = 12, bu
 
 
 @router.get("/analytics/risky-users")
-def analytics_risky_users(limit: int = 10, db: Session = Depends(get_db)):
+def analytics_risky_users(db: Annotated[Session, Depends(get_db)], limit: int = 10):
     events = db.query(LoginEvent).order_by(LoginEvent.risk_score.desc(), LoginEvent.id.desc()).limit(limit).all()
     return [
         {
@@ -401,7 +401,7 @@ def analytics_risky_users(limit: int = 10, db: Session = Depends(get_db)):
 
 
 @router.get("/events/enriched")
-def events_enriched(limit: int = 50, db: Session = Depends(get_db)):
+def events_enriched(db: Annotated[Session, Depends(get_db)], limit: int = 50):
     events = db.query(LoginEvent).order_by(LoginEvent.id.desc()).limit(limit).all()
     triage_by_event = {
         item.event_id: item
@@ -434,8 +434,8 @@ def events_enriched(limit: int = 50, db: Session = Depends(get_db)):
     return payload
 
 
-@router.post("/events/{event_id}/triage")
-def update_event_triage(event_id: int, body: EventTriageRequest, db: Session = Depends(get_db)):
+@router.post("/events/{event_id}/triage", responses={404: {"description": "event not found"}})
+def update_event_triage(event_id: int, body: EventTriageRequest, db: Annotated[Session, Depends(get_db)]):
     event = db.query(LoginEvent).filter(LoginEvent.id == event_id).one_or_none()
     if event is None:
         raise HTTPException(status_code=404, detail="event not found")
@@ -463,7 +463,7 @@ def update_event_triage(event_id: int, body: EventTriageRequest, db: Session = D
 
 
 @router.get("/cases")
-def list_cases(limit: int = 100, db: Session = Depends(get_db)):
+def list_cases(db: Annotated[Session, Depends(get_db)], limit: int = 100):
     cases = db.query(IncidentCase).order_by(IncidentCase.id.desc()).limit(limit).all()
 
     case_ids = [case.id for case in cases]
@@ -489,7 +489,7 @@ def list_cases(limit: int = 100, db: Session = Depends(get_db)):
 
 
 @router.post("/cases")
-def create_case(body: CreateCaseRequest, db: Session = Depends(get_db)):
+def create_case(body: CreateCaseRequest, db: Annotated[Session, Depends(get_db)]):
     item = IncidentCase(
         title=body.title,
         status=body.status,
@@ -510,8 +510,8 @@ def create_case(body: CreateCaseRequest, db: Session = Depends(get_db)):
     return {"id": item.id, "title": item.title, "status": item.status, "priority": item.priority, "owner": item.owner}
 
 
-@router.patch("/cases/{case_id}")
-def update_case(case_id: int, body: UpdateCaseRequest, db: Session = Depends(get_db)):
+@router.patch("/cases/{case_id}", responses={404: {"description": "case not found"}})
+def update_case(case_id: int, body: UpdateCaseRequest, db: Annotated[Session, Depends(get_db)]):
     item = db.query(IncidentCase).filter(IncidentCase.id == case_id).one_or_none()
     if item is None:
         raise HTTPException(status_code=404, detail="case not found")
@@ -539,7 +539,7 @@ def update_case(case_id: int, body: UpdateCaseRequest, db: Session = Depends(get
 
 
 @router.get("/detection-rules")
-def list_detection_rules(db: Session = Depends(get_db)):
+def list_detection_rules(db: Annotated[Session, Depends(get_db)]):
     _seed_detection_rules(db)
     rules = db.query(DetectionRule).order_by(DetectionRule.id.asc()).all()
     return [
@@ -558,8 +558,8 @@ def list_detection_rules(db: Session = Depends(get_db)):
     ]
 
 
-@router.patch("/detection-rules/{rule_id}")
-def update_detection_rule(rule_id: int, body: DetectionRuleRequest, db: Session = Depends(get_db)):
+@router.patch("/detection-rules/{rule_id}", responses={404: {"description": "rule not found"}})
+def update_detection_rule(rule_id: int, body: DetectionRuleRequest, db: Annotated[Session, Depends(get_db)]):
     item = db.query(DetectionRule).filter(DetectionRule.id == rule_id).one_or_none()
     if item is None:
         raise HTTPException(status_code=404, detail="rule not found")
@@ -586,8 +586,8 @@ def update_detection_rule(rule_id: int, body: DetectionRuleRequest, db: Session 
     }
 
 
-@router.get("/detection-rules/{rule_id}/backtest")
-def backtest_detection_rule(rule_id: int, days: int = 30, db: Session = Depends(get_db)):
+@router.get("/detection-rules/{rule_id}/backtest", responses={404: {"description": "rule not found"}})
+def backtest_detection_rule(rule_id: int, db: Annotated[Session, Depends(get_db)], days: int = 30):
     item = db.query(DetectionRule).filter(DetectionRule.id == rule_id).one_or_none()
     if item is None:
         raise HTTPException(status_code=404, detail="rule not found")
@@ -608,7 +608,7 @@ def backtest_detection_rule(rule_id: int, days: int = 30, db: Session = Depends(
 
 
 @router.get("/policies")
-def list_policies(db: Session = Depends(get_db)):
+def list_policies(db: Annotated[Session, Depends(get_db)]):
     defaults = [
         ("blocked_countries", "IR,SY,KP", "Comma separated country deny list"),
         ("password_spray_window_minutes", "15", "Window for spray detection"),
@@ -637,8 +637,8 @@ def list_policies(db: Session = Depends(get_db)):
     ]
 
 
-@router.patch("/policies/{policy_id}")
-def update_policy(policy_id: int, body: PolicyRequest, db: Session = Depends(get_db)):
+@router.patch("/policies/{policy_id}", responses={404: {"description": "policy not found"}})
+def update_policy(policy_id: int, body: PolicyRequest, db: Annotated[Session, Depends(get_db)]):
     item = db.query(SecurityPolicy).filter(SecurityPolicy.id == policy_id).one_or_none()
     if item is None:
         raise HTTPException(status_code=404, detail="policy not found")
@@ -651,7 +651,7 @@ def update_policy(policy_id: int, body: PolicyRequest, db: Session = Depends(get
 
 
 @router.get("/containment/tickets")
-def list_tickets(limit: int = 100, db: Session = Depends(get_db)):
+def list_tickets(db: Annotated[Session, Depends(get_db)], limit: int = 100):
     rows = db.query(ContainmentTicket).order_by(ContainmentTicket.id.desc()).limit(limit).all()
     return [
         {
@@ -670,7 +670,7 @@ def list_tickets(limit: int = 100, db: Session = Depends(get_db)):
 
 
 @router.post("/containment/tickets")
-def create_ticket(body: CreateTicketRequest, db: Session = Depends(get_db)):
+def create_ticket(body: CreateTicketRequest, db: Annotated[Session, Depends(get_db)]):
     serial = db.query(ContainmentTicket).count() + 1
     ticket_id = f"CT-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{serial:04d}"
 
@@ -691,8 +691,8 @@ def create_ticket(body: CreateTicketRequest, db: Session = Depends(get_db)):
     return {"id": row.id, "ticket_id": row.ticket_id, "entity": row.entity, "severity": row.severity, "status": row.status}
 
 
-@router.patch("/containment/tickets/{ticket_id}")
-def update_ticket(ticket_id: int, status: str, db: Session = Depends(get_db)):
+@router.patch("/containment/tickets/{ticket_id}", responses={404: {"description": "ticket not found"}})
+def update_ticket(ticket_id: int, status: str, db: Annotated[Session, Depends(get_db)]):
     row = db.query(ContainmentTicket).filter(ContainmentTicket.id == ticket_id).one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="ticket not found")
@@ -705,7 +705,7 @@ def update_ticket(ticket_id: int, status: str, db: Session = Depends(get_db)):
 
 
 @router.get("/access-restrictions")
-def list_access_restrictions(db: Session = Depends(get_db)):
+def list_access_restrictions(db: Annotated[Session, Depends(get_db)]):
     rows = db.query(AccessRestriction).order_by(AccessRestriction.id.desc()).all()
     return [
         {
@@ -721,8 +721,8 @@ def list_access_restrictions(db: Session = Depends(get_db)):
     ]
 
 
-@router.post("/access-restrictions")
-def create_access_restriction(body: RestrictionRequest, db: Session = Depends(get_db)):
+@router.post("/access-restrictions", responses={400: {"description": "expires_at must be ISO format"}})
+def create_access_restriction(body: RestrictionRequest, db: Annotated[Session, Depends(get_db)]):
     try:
         expires_at = datetime.fromisoformat(body.expires_at)
     except ValueError as exc:
@@ -750,8 +750,8 @@ def create_access_restriction(body: RestrictionRequest, db: Session = Depends(ge
     }
 
 
-@router.delete("/access-restrictions/{restriction_id}")
-def deactivate_access_restriction(restriction_id: int, db: Session = Depends(get_db)):
+@router.delete("/access-restrictions/{restriction_id}",responses={404: {"description": "Restriction not found"}})
+def deactivate_access_restriction(restriction_id: int, db: Annotated[Session, Depends(get_db)]):
     row = db.query(AccessRestriction).filter(AccessRestriction.id == restriction_id).one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="restriction not found")
@@ -763,7 +763,7 @@ def deactivate_access_restriction(restriction_id: int, db: Session = Depends(get
 
 
 @router.get("/reports/weekly")
-def weekly_report(db: Session = Depends(get_db)):
+def weekly_report(db: Annotated[Session, Depends(get_db)]):
     events = db.query(LoginEvent).all()
     mitigations = db.query(MitigationLog).all()
 
@@ -787,7 +787,7 @@ def weekly_report(db: Session = Depends(get_db)):
 
 
 @router.get("/reports/export")
-def report_export(limit: int = 100, db: Session = Depends(get_db)):
+def report_export(db: Annotated[Session, Depends(get_db)], limit: int = 100):
     events = db.query(LoginEvent).order_by(LoginEvent.id.desc()).limit(limit).all()
     mitigations = db.query(MitigationLog).order_by(MitigationLog.id.desc()).limit(limit).all()
 
@@ -817,7 +817,7 @@ def report_export(limit: int = 100, db: Session = Depends(get_db)):
 
 
 @router.get("/investigation/graph")
-def investigation_graph(limit: int = 200, db: Session = Depends(get_db)):
+def investigation_graph(db: Annotated[Session, Depends(get_db)], limit: int = 200):
     events = db.query(LoginEvent).order_by(LoginEvent.id.desc()).limit(limit).all()
 
     user_nodes = {event.username for event in events}
@@ -841,7 +841,7 @@ def investigation_graph(limit: int = 200, db: Session = Depends(get_db)):
 
 
 @router.get("/ingestion/health")
-def ingestion_health(db: Session = Depends(get_db)):
+def ingestion_health(db: Annotated[Session, Depends(get_db)]):
     event_count = db.query(LoginEvent).count()
     mitigation_count = db.query(MitigationLog).count()
     restriction_count = db.query(AccessRestriction).count()
