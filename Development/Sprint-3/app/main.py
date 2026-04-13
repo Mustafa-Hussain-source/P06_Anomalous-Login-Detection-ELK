@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
+from typing import Annotated
 from .auth_database import AuthSessionLocal, auth_engine, get_auth_db
 from .auth_models import AuthBase, AuthUser
 from .database import DB_PATH, SessionLocal, engine, get_db
@@ -444,15 +444,17 @@ def _ensure_default_auth_user() -> None:
 _ensure_default_auth_user()
 
 
-@app.post("/auth/login")
-def auth_login(payload: AuthLoginRequest, db: Session = Depends(get_auth_db)):
+USERNAME_REQUIRED_MSG = "username required"
+INVALID_CREDENTIALS_MSG = "invalid username or password"
+@app.post("/auth/login", responses={400: {"description": USERNAME_REQUIRED_MSG}, 401: {"description": INVALID_CREDENTIALS_MSG}})
+def auth_login(payload: AuthLoginRequest, db: Annotated[Session, Depends(get_auth_db)]):
     username = payload.username.strip()
     if not username:
-        raise HTTPException(status_code=400, detail="username required")
+        raise HTTPException(status_code=400, detail=USERNAME_REQUIRED_MSG)
 
     row = db.query(AuthUser).filter(AuthUser.username == username).one_or_none()
     if row is None or row.password_hash != _hash_password(payload.password):
-        raise HTTPException(status_code=401, detail="invalid username or password")
+        raise HTTPException(status_code=401, detail=INVALID_CREDENTIALS_MSG)
 
     return {
         "success": True,
@@ -461,17 +463,17 @@ def auth_login(payload: AuthLoginRequest, db: Session = Depends(get_auth_db)):
         "message": "Login successful",
     }
 
-
-@app.post("/auth/users")
-def create_auth_user(payload: AuthUserCreateRequest, db: Session = Depends(get_auth_db)):
+USERNAME_EXISTS_MSG = "username already exists"
+@app.post("/auth/users", responses={400: {"description": USERNAME_REQUIRED_MSG}, 401: {"description": "password required"}, 409: {"description": USERNAME_EXISTS_MSG}})
+def create_auth_user(payload: AuthUserCreateRequest, db: Annotated[Session, Depends(get_auth_db)]):
     username = payload.username.strip()
     if not username:
-        raise HTTPException(status_code=400, detail="username required")
+        raise HTTPException(status_code=400, detail=USERNAME_REQUIRED_MSG)
     if not payload.password:
-        raise HTTPException(status_code=400, detail="password required")
+        raise HTTPException(status_code=401, detail="password required")
 
     if db.query(AuthUser).filter(AuthUser.username == username).one_or_none() is not None:
-        raise HTTPException(status_code=409, detail="username already exists")
+        raise HTTPException(status_code=409, detail=USERNAME_EXISTS_MSG)
 
     display_name = (payload.display_name or "").strip() or username
     row = AuthUser(username=username, password_hash=_hash_password(payload.password), display_name=display_name)
@@ -482,7 +484,7 @@ def create_auth_user(payload: AuthUserCreateRequest, db: Session = Depends(get_a
 
 
 @app.get("/auth/users")
-def list_auth_users(db: Session = Depends(get_auth_db)):
+def list_auth_users(db: Annotated[Session, Depends(get_auth_db)]):
     rows = db.query(AuthUser).order_by(AuthUser.id.asc()).all()
     return [{"id": row.id, "username": row.username, "display_name": row.display_name or row.username} for row in rows]
 
@@ -666,17 +668,17 @@ def _simulation_base_url(request: Request) -> str:
     return f"{scheme}://{host}"
 
 
-@app.post("/login", response_model=LoginResponse)
+@app.post("/login", response_model=LoginResponse, responses={400: {"description": USERNAME_REQUIRED_MSG}, 403: {"description": "account locked or ip blacklisted"}, 200: {"description": "login result with possible mitigations"}})
 def login(
     payload: LoginRequest,
-    db: Session = Depends(get_db),
-    x_forwarded_for: str | None = Header(default=None, alias="X-Forwarded-For"),
-    x_country: str | None = Header(default=None, alias="X-Country"),
-    x_seed_session: str | None = Header(default=None, alias="X-Seed-Session"),
+    db: Annotated[Session, Depends(get_db)],
+    x_forwarded_for: Annotated[str | None, Header(alias="X-Forwarded-For")] = None,
+    x_country: Annotated[str | None, Header(alias="X-Country")] = None,
+    x_seed_session: Annotated[str | None, Header(alias="X-Seed-Session")] = None,
 ):
     username = payload.username.strip()
     if not username:
-        raise HTTPException(status_code=400, detail="username required")
+        raise HTTPException(status_code=400, detail=USERNAME_REQUIRED_MSG)
 
     user = db.query(User).filter(User.username == username).one_or_none()
     if not user:
@@ -923,7 +925,7 @@ def login(
 
 
 @app.get("/events")
-def list_events(limit: int = 50, db: Session = Depends(get_db)):
+def list_events(db: Annotated[Session, Depends(get_db)], limit: int = 50):
     events = (
         db.query(LoginEvent)
         .order_by(LoginEvent.id.desc())
@@ -951,7 +953,7 @@ def list_events(limit: int = 50, db: Session = Depends(get_db)):
 
 
 @app.get("/seed/database-preview")
-def seed_database_preview(users_limit: int = 80, events_limit: int = 120, db: Session = Depends(get_db)):
+def seed_database_preview(db: Annotated[Session, Depends(get_db)], users_limit: int = 80, events_limit: int = 120):
     users_payload, events_payload = build_seed_payloads()
 
     seed_users = [
@@ -1037,7 +1039,7 @@ def seed_database_preview(users_limit: int = 80, events_limit: int = 120, db: Se
 
 
 @app.get("/seed/users")
-def list_seed_users(limit: int = 200, db: Session = Depends(get_db)):
+def list_seed_users(db: Annotated[Session, Depends(get_db)], limit: int = 200):
     users = db.query(User).order_by(User.id.asc()).limit(limit).all()
     return [
         {
@@ -1050,14 +1052,14 @@ def list_seed_users(limit: int = 200, db: Session = Depends(get_db)):
     ]
 
 
-@app.post("/seed/users")
-def create_seed_user(body: SeedUserCreateRequest, db: Session = Depends(get_db)):
+@app.post("/seed/users", responses={400: {"description": USERNAME_REQUIRED_MSG}, 409: {"description": USERNAME_EXISTS_MSG}})
+def create_seed_user(body: SeedUserCreateRequest, db: Annotated[Session, Depends(get_db)]):
     username = body.username.strip()
     if not username:
-        raise HTTPException(status_code=400, detail="username required")
+        raise HTTPException(status_code=400, detail=USERNAME_REQUIRED_MSG)
 
     if db.query(User).filter(User.username == username).one_or_none() is not None:
-        raise HTTPException(status_code=409, detail="username already exists")
+        raise HTTPException(status_code=409, detail=USERNAME_EXISTS_MSG)
 
     row = User(
         username=username,
@@ -1077,8 +1079,8 @@ def create_seed_user(body: SeedUserCreateRequest, db: Session = Depends(get_db))
     }
 
 
-@app.patch("/seed/users/{user_id}")
-def update_seed_user(user_id: int, body: SeedUserUpdateRequest, db: Session = Depends(get_db)):
+@app.patch("/seed/users/{user_id}", responses={400: {"description": "username cannot be empty"}, 404: {"description": "user not found"}, 409: {"description": USERNAME_EXISTS_MSG}})
+def update_seed_user(user_id: int, body: SeedUserUpdateRequest, db: Annotated[Session, Depends(get_db)]):
     row = db.query(User).filter(User.id == user_id).one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="user not found")
@@ -1102,7 +1104,7 @@ def update_seed_user(user_id: int, body: SeedUserUpdateRequest, db: Session = De
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail="username already exists") from exc
+        raise HTTPException(status_code=409, detail=USERNAME_EXISTS_MSG) from exc
 
     db.refresh(row)
     return {
@@ -1113,8 +1115,8 @@ def update_seed_user(user_id: int, body: SeedUserUpdateRequest, db: Session = De
     }
 
 
-@app.delete("/seed/users/{user_id}")
-def delete_seed_user(user_id: int, db: Session = Depends(get_db)):
+@app.delete("/seed/users/{user_id}", responses={404: {"description": "user not found"}})
+def delete_seed_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
     row = db.query(User).filter(User.id == user_id).one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="user not found")
@@ -1126,7 +1128,7 @@ def delete_seed_user(user_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/mitigations")
-def list_mitigations(limit: int = 50, db: Session = Depends(get_db)):
+def list_mitigations(db: Annotated[Session, Depends(get_db)], limit: int = 50):
     items = (
         db.query(MitigationLog)
         .order_by(MitigationLog.id.desc())
@@ -1147,7 +1149,7 @@ def list_mitigations(limit: int = 50, db: Session = Depends(get_db)):
 
 
 @app.post("/events/clear")
-def clear_events(seed: bool = True, db: Session = Depends(get_db)):
+def clear_events(db: Annotated[Session, Depends(get_db)], seed: bool = True):
     db.query(LoginEvent).delete()
     db.query(MitigationLog).delete()
     db.query(AccessRestriction).delete()
@@ -1208,7 +1210,7 @@ def trigger_uc_014(request: Request, background_tasks: BackgroundTasks):
 
 
 @app.post("/simulate/uc-015")
-def trigger_uc_015(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def trigger_uc_015(request: Request, background_tasks: BackgroundTasks, db: Annotated[Session, Depends(get_db)]):
     background_tasks.add_task(simulate_uc_015, _simulation_base_url(request))
     _record_mitigation(db, "UC-015", "Impossible Travel Tester", "mfa_stepup", status="pending")
     db.commit()
@@ -1216,7 +1218,7 @@ def trigger_uc_015(request: Request, background_tasks: BackgroundTasks, db: Sess
 
 
 @app.post("/simulate/uc-016")
-def trigger_uc_016(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def trigger_uc_016(request: Request, background_tasks: BackgroundTasks, db: Annotated[Session, Depends(get_db)]):
     background_tasks.add_task(simulate_uc_016, _simulation_base_url(request))
     _record_mitigation(db, "UC-016", "sim-key-016", "api_key_revoke", status="pending")
     db.commit()
@@ -1224,7 +1226,7 @@ def trigger_uc_016(request: Request, background_tasks: BackgroundTasks, db: Sess
 
 
 @app.post("/simulate/uc-017")
-def trigger_uc_017(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def trigger_uc_017(request: Request, background_tasks: BackgroundTasks, db: Annotated[Session, Depends(get_db)]):
     background_tasks.add_task(simulate_uc_017, _simulation_base_url(request))
     _record_mitigation(db, "UC-017", "Blocked Region Tester", "region_block", status="pending")
     db.commit()
@@ -1232,7 +1234,7 @@ def trigger_uc_017(request: Request, background_tasks: BackgroundTasks, db: Sess
 
 
 @app.post("/simulate/uc-018")
-def trigger_uc_018(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def trigger_uc_018(request: Request, background_tasks: BackgroundTasks, db: Annotated[Session, Depends(get_db)]):
     background_tasks.add_task(simulate_uc_018, _simulation_base_url(request))
     _record_mitigation(db, "UC-018", "Sprint4 Admin User", "admin_console_block", status="pending")
     db.commit()
@@ -1246,7 +1248,7 @@ def trigger_uc_019(request: Request, background_tasks: BackgroundTasks):
 
 
 @app.post("/simulate/uc-020")
-def trigger_uc_020(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def trigger_uc_020(request: Request, background_tasks: BackgroundTasks, db: Annotated[Session, Depends(get_db)]):
     background_tasks.add_task(simulate_uc_020, _simulation_base_url(request))
     _record_mitigation(db, "UC-020", "203.0.113.20", "temporary_access_restriction", status="pending")
     db.commit()
@@ -1254,7 +1256,7 @@ def trigger_uc_020(request: Request, background_tasks: BackgroundTasks, db: Sess
 
 
 @app.get("/sprint4/evidence")
-def list_sprint4_evidence(limit: int = 50, db: Session = Depends(get_db)):
+def list_sprint4_evidence(db: Annotated[Session, Depends(get_db)], limit: int = 50):
     max_items = max(limit, 1)
     records: list[dict] = []
 
