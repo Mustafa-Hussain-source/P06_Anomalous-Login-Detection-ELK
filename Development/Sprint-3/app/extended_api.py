@@ -308,7 +308,11 @@ def analytics_threat_velocity(db: Annotated[Session, Depends(get_db)], hours: in
     from datetime import timedelta
     
     # Get events from the last N hours
-    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+    MAX_BUCKETS = 50
+    MAX_HOURS = 168
+    safe_buckets = min(max(buckets, 1), MAX_BUCKETS)
+    safe_hours = min(max(hours, 1), MAX_HOURS)
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=safe_hours)
     events = db.query(LoginEvent).filter(LoginEvent.timestamp >= cutoff_time).all()
     
     if not events:
@@ -316,13 +320,13 @@ def analytics_threat_velocity(db: Annotated[Session, Depends(get_db)], hours: in
         return [
             {
                 "bucket": i,
-                "start_time": _iso(cutoff_time + timedelta(hours=hours/buckets * i)),
-                "end_time": _iso(cutoff_time + timedelta(hours=hours/buckets * (i + 1))),
+                "start_time": _iso(cutoff_time + timedelta(hours=safe_hours/safe_buckets * i)),
+                "end_time": _iso(cutoff_time + timedelta(hours=safe_hours/safe_buckets * (i + 1))),
                 "event_count": 0,
                 "total_risk": 0,
                 "avg_risk": 0,
             }
-            for i in range(buckets)
+            for i in range(safe_buckets)
         ]
     
     # Create time buckets
@@ -331,8 +335,8 @@ def analytics_threat_velocity(db: Annotated[Session, Depends(get_db)], hours: in
     
     if min_time == max_time:
         # All events at same time, put in middle bucket
-        bucket_duration = timedelta(hours=hours / buckets)
-        start_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+        bucket_duration = timedelta(hours=safe_hours / safe_buckets)
+        start_time = datetime.now(timezone.utc) - timedelta(hours=safe_hours)
         buckets_data = [
             {
                 "bucket": i,
@@ -342,10 +346,10 @@ def analytics_threat_velocity(db: Annotated[Session, Depends(get_db)], hours: in
                 "total_risk": 0,
                 "avg_risk": 0,
             }
-            for i in range(buckets)
+            for i in range(safe_buckets)
         ]
         # Put all events in middle bucket
-        middle = buckets // 2
+        middle = safe_buckets // 2
         total_risk = sum(e.risk_score for e in events)
         buckets_data[middle]["event_count"] = len(events)
         buckets_data[middle]["total_risk"] = total_risk
@@ -353,23 +357,23 @@ def analytics_threat_velocity(db: Annotated[Session, Depends(get_db)], hours: in
         return buckets_data
     
     # Distribute events into buckets based on timestamp
-    bucket_duration = (max_time - min_time) / buckets
-    bucket_map: dict[int, list] = {i: [] for i in range(buckets)}
+    bucket_duration = (max_time - min_time) / safe_buckets
+    bucket_map: dict[int, list] = {i: [] for i in range(safe_buckets)}
     
     for event in events:
         if bucket_duration == timedelta(0):
-            bucket_idx = buckets // 2
+            bucket_idx = safe_buckets // 2
         else:
             elapsed = event.timestamp - min_time
-            bucket_idx = min(int(elapsed / bucket_duration), buckets - 1)
+            bucket_idx = min(int(elapsed / bucket_duration), safe_buckets - 1)
         bucket_map[bucket_idx].append(event)
     
     # Build response
-    start_time = datetime.now(timezone.utc) - timedelta(hours=hours)
-    bucket_duration_fixed = timedelta(hours=hours / buckets)
+    start_time = datetime.now(timezone.utc) - timedelta(hours=safe_hours)
+    bucket_duration_fixed = timedelta(hours=safe_hours / safe_buckets)
     
     result = []
-    for i in range(buckets):
+    for i in range(safe_buckets):
         bucket_events = bucket_map[i]
         total_risk = sum(e.risk_score for e in bucket_events)
         result.append(
