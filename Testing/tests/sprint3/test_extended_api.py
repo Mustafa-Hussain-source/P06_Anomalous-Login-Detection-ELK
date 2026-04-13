@@ -29,7 +29,7 @@ class ExtendedApiTests(unittest.IsolatedAsyncioTestCase):
         rules_response = await self.client.get('/detection-rules')
         self.assertEqual(rules_response.status_code, 200)
         rules = rules_response.json()
-        self.assertTrue(len(rules) > 0)
+        self.assertGreater(len(rules), 0)
 
         rule_id = rules[0]['id']
         backtest_response = await self.client.get(f'/detection-rules/{rule_id}/backtest?days=7')
@@ -114,7 +114,7 @@ class ExtendedApiTests(unittest.IsolatedAsyncioTestCase):
         policies_response = await self.client.get('/policies')
         self.assertEqual(policies_response.status_code, 200)
         policies = policies_response.json()
-        self.assertTrue(len(policies) > 0)
+        self.assertGreater(len(policies), 0)
 
         target = policies[0]
         update_response = await self.client.patch(f"/policies/{target['id']}", json={'value': 'TEST-VALUE'})
