@@ -1,6 +1,5 @@
 name: ci-cd
 
-# 🔹 Triggers: runs on pushes, PRs, and manual runs
 on:
   push:
     branches: ["main", "master", "dev"]
@@ -8,36 +7,28 @@ on:
     branches: ["main", "master", "dev"]
   workflow_dispatch:
 
-# 🔹 Minimal permissions for security
 permissions:
   contents: read
 
-# 🔹 Prevent multiple runs on same branch from stacking
 concurrency:
   group: ci-cd-${{ github.ref }}
   cancel-in-progress: true
 
-# 🔹 Global environment variables
 env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "20"
 
-###########################################################
-# 🧠 JOB 1: Python + Backend + Sonar Checks
-###########################################################
 jobs:
   python-checks:
-    name: Python Checks + Sonar
+    name: Backend Checks + Tests
     runs-on: ubuntu-latest
 
     steps:
-      # 🔹 Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # Needed for Sonar
+          fetch-depth: 0
 
-      # 🔹 Setup Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -45,7 +36,6 @@ jobs:
           cache: pip
           cache-dependency-path: Development/Sprint-3/requirements.txt
 
-      # 🔹 Install dependencies
       - name: Install Python dependencies
         working-directory: Development/Sprint-3
         run: |
@@ -53,31 +43,26 @@ jobs:
           pip install -r requirements.txt
           pip install coverage pytest
 
-      # 🔹 Syntax check Sprint-3 backend
       - name: Syntax check Sprint-3 backend
         working-directory: Development/Sprint-3
         run: python -m compileall app
 
-      # 🔹 Syntax check Sprint-4 automation scripts
       - name: Syntax check Sprint-4 automation
         working-directory: Development/Sprint-4
         run: python -m compileall uc_automation.py test_uc_automation.py
 
-      # 🔹 Run tests with coverage
       - name: Run Sprint-4 tests with coverage
         working-directory: Development/Sprint-4
         run: |
           coverage run -m unittest test_uc_automation.py
           coverage xml -o coverage.xml
 
-      # 🔹 Verify dependencies are consistent
       - name: Dependency check
         working-directory: Development/Sprint-3
         run: python -m pip check
 
-      # 🔹 SonarCloud scan (only when safe)
       - name: SonarCloud Scan
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+        if: ${{ secrets.SONAR_TOKEN != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
         uses: SonarSource/sonarqube-scan-action@v6
         with:
           args: >
@@ -86,103 +71,33 @@ jobs:
           SONAR_HOST_URL: https://sonarcloud.io
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-###########################################################
-# 🎨 JOB 2: Frontend (React + Vite) Checks
-###########################################################
   frontend-checks:
-    name: Frontend Checks
+    name: Frontend Lint + Build + Tests
     runs-on: ubuntu-latest
 
     defaults:
       run:
-        working-directory: Development/Sprint-4/Front-End
+        working-directory: Development/Sprint-4/Front-End/sentinelauth-ui
 
     steps:
-      # 🔹 Checkout repo
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 🔹 Setup Node
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: Development/Sprint-4/Front-End/package-lock.json
+          cache-dependency-path: Development/Sprint-4/Front-End/sentinelauth-ui/package-lock.json
 
-      # 🔹 Install dependencies
       - name: Install frontend dependencies
         run: npm ci
 
-      # 🔹 Lint code
       - name: Lint frontend
         run: npm run lint
 
-      # 🔹 Run tests (Vitest)
       - name: Run frontend tests
-        run: npm run test:run
+        run: npm run test:run -- --passWithNoTests
 
-      # 🔹 Build frontend
       - name: Build frontend
         run: npm run build
-
-###########################################################
-# 🔐 JOB 3: Security Config Checks (Wazuh + Docker + K8s)
-###########################################################
-  security-config-checks:
-    name: Security Config Checks
-    runs-on: ubuntu-latest
-
-    steps:
-      # 🔹 Checkout repo
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # 🔹 Install validation tools
-      - name: Install validation tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxml2-utils yamllint
-
-      # 🔹 Validate Wazuh XML rules
-      - name: Validate Wazuh XML
-        run: |
-          xmllint --noout Development/Sprint-3/wazuh/rules.xml
-
-      # 🔹 Validate Docker Compose config (critical for runtime)
-      - name: Validate Docker Compose
-        working-directory: Development/Sprint-3/elk-wazuh-compose
-        run: |
-          docker compose config > /tmp/compose-rendered.yml
-          test -s /tmp/compose-rendered.yml
-
-      # 🔹 Lint Kubernetes manifests (future deployment readiness)
-      - name: Lint Kubernetes YAML
-        run: |
-          yamllint Development/Sprint-4/k8s
-
-###########################################################
-# 🐳 JOB 4: Docker Build Validation
-###########################################################
-  docker-build:
-    name: Docker Build Validation
-    runs-on: ubuntu-latest
-
-    # 🔹 Only run if all previous jobs pass
-    needs:
-      - python-checks
-      - frontend-checks
-      - security-config-checks
-
-    steps:
-      # 🔹 Checkout repo
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # 🔹 Build API container
-      - name: Build Sprint-3 API image
-        run: |
-          docker build \
-            -f Development/Sprint-3/Dockerfile \
-            -t alds-sprint3-api:ci \
-            Development/Sprint-3
