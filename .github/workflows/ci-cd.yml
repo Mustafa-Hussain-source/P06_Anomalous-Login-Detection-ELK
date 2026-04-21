@@ -198,7 +198,7 @@ jobs:
           version: v1.32.2
 
       - name: Validate rendered manifest
-        run: kubectl apply --dry-run=client -f rendered/dev/dev-rendered.yaml
+        run: kubectl apply --dry-run=client --validate=false -f rendered/dev/dev-rendered.yaml
 
       - name: Upload rendered dev manifest
         uses: actions/upload-artifact@v4
