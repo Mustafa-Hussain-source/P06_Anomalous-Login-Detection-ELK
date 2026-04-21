@@ -18,6 +18,7 @@ env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "20"
   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  BACKEND_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/p06-anomalous-login-detection-elk-backend
 
 jobs:
   python-checks:
@@ -151,7 +152,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/p06-anomalous-login-detection-elk-backend
+          images: ${{ env.BACKEND_IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=sha,prefix=sha-
@@ -165,3 +166,96 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  deploy-dev-render:
+    name: Deploy Dev Render Preview
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' }}
+    needs:
+      - docker-publish
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image reference
+        run: echo "IMAGE_REF=${{ env.BACKEND_IMAGE_NAME }}:sha-${{ github.sha }}" >> "$GITHUB_ENV"
+
+      - name: Render dev deployment manifest
+        run: |
+          mkdir -p rendered/dev
+          cat Development/Sprint-4/k8s/namespace.yaml \
+            Development/Sprint-4/k8s/configmap.yaml \
+            > rendered/dev/dev-rendered.yaml
+          sed "s|image: alds-sprint3-api:v1.0|image: ${IMAGE_REF}|" Development/Sprint-4/k8s/deployment.yaml \
+            >> rendered/dev/dev-rendered.yaml
+          printf "\n---\n" >> rendered/dev/dev-rendered.yaml
+          cat Development/Sprint-4/k8s/service.yaml >> rendered/dev/dev-rendered.yaml
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.32.2
+
+      - name: Validate rendered manifest
+        run: kubectl apply --dry-run=client -f rendered/dev/dev-rendered.yaml
+
+      - name: Upload rendered dev manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-rendered-manifest
+          path: rendered/dev/dev-rendered.yaml
+
+  deploy-dev:
+    name: Deploy Dev Smoke Validation
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' }}
+    needs:
+      - docker-publish
+      - deploy-dev-render
+    environment:
+      name: dev
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull backend image
+        run: docker pull ${{ env.BACKEND_IMAGE_NAME }}:sha-${{ github.sha }}
+
+      - name: Start dev validation container
+        run: |
+          docker run -d --rm --name alds-dev-smoke -p 18000:8000 \
+            ${{ env.BACKEND_IMAGE_NAME }}:sha-${{ github.sha }}
+
+      - name: Wait for app readiness
+        run: |
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:18000/docs > /dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Application did not become ready in time" >&2
+          exit 1
+
+      - name: Smoke check docs endpoint
+        run: curl --fail http://127.0.0.1:18000/docs
+
+      - name: Smoke check traffic status endpoint
+        run: curl --fail http://127.0.0.1:18000/traffic/status
+
+      - name: Dump container logs on failure
+        if: ${{ failure() }}
+        run: docker logs alds-dev-smoke
+
+      - name: Stop dev validation container
+        if: ${{ always() }}
+        run: docker stop alds-dev-smoke
