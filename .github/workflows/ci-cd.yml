@@ -184,21 +184,21 @@ jobs:
       - name: Render dev deployment manifest
         run: |
           mkdir -p rendered/dev
-          cat Development/Sprint-4/k8s/namespace.yaml \
-            Development/Sprint-4/k8s/configmap.yaml \
-            > rendered/dev/dev-rendered.yaml
+          cat Development/Sprint-4/k8s/namespace.yaml > rendered/dev/dev-rendered.yaml
+          printf "\n---\n" >> rendered/dev/dev-rendered.yaml
+          cat Development/Sprint-4/k8s/configmap.yaml >> rendered/dev/dev-rendered.yaml
+          printf "\n---\n" >> rendered/dev/dev-rendered.yaml
           sed "s|image: alds-sprint3-api:v1.0|image: ${IMAGE_REF}|" Development/Sprint-4/k8s/deployment.yaml \
             >> rendered/dev/dev-rendered.yaml
           printf "\n---\n" >> rendered/dev/dev-rendered.yaml
           cat Development/Sprint-4/k8s/service.yaml >> rendered/dev/dev-rendered.yaml
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: v1.32.2
-
       - name: Validate rendered manifest
-        run: kubectl apply --dry-run=client --validate=false -f rendered/dev/dev-rendered.yaml
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workdir" \
+            ghcr.io/yannh/kubeconform:latest \
+            -strict -summary /workdir/rendered/dev/dev-rendered.yaml
 
       - name: Upload rendered dev manifest
         uses: actions/upload-artifact@v4
