@@ -106,6 +106,7 @@ jobs:
   docker-build:
     name: Backend Docker Build
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
     needs:
       - python-checks
       - frontend-checks
@@ -120,3 +121,47 @@ jobs:
             -f Development/Sprint-3/Dockerfile \
             -t alds-sprint3-api:${{ github.sha }} \
             Development/Sprint-3
+
+  docker-publish:
+    name: Backend Docker Publish
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' }}
+    needs:
+      - python-checks
+      - frontend-checks
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/p06-anomalous-login-detection-elk-backend
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Sprint-3 backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: Development/Sprint-3
+          file: Development/Sprint-3/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
