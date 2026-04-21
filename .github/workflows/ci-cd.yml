@@ -102,3 +102,21 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+  docker-build:
+    name: Backend Docker Build
+    runs-on: ubuntu-latest
+    needs:
+      - python-checks
+      - frontend-checks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Sprint-3 backend image
+        run: |
+          docker build \
+            -f Development/Sprint-3/Dockerfile \
+            -t alds-sprint3-api:${{ github.sha }} \
+            Development/Sprint-3
