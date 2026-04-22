@@ -1,4 +1,4 @@
-name: ci-cd
+name: CI
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-cd-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -138,11 +138,6 @@ jobs:
     needs:
       - python-checks
       - frontend-checks
-    outputs:
-      backend_image_name: ${{ steps.image.outputs.backend_name }}
-      backend_image_ref: ${{ steps.image.outputs.backend_ref }}
-      frontend_image_name: ${{ steps.image.outputs.frontend_name }}
-      frontend_image_ref: ${{ steps.image.outputs.frontend_ref }}
     permissions:
       contents: read
       packages: write
@@ -158,9 +153,7 @@ jobs:
           backend_image_name="ghcr.io/${owner_lc}/${BACKEND_IMAGE_REPO}"
           frontend_image_name="ghcr.io/${owner_lc}/${FRONTEND_IMAGE_REPO}"
           echo "backend_name=${backend_image_name}" >> "$GITHUB_OUTPUT"
-          echo "backend_ref=${backend_image_name}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "frontend_name=${frontend_image_name}" >> "$GITHUB_OUTPUT"
-          echo "frontend_ref=${frontend_image_name}:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -209,166 +202,3 @@ jobs:
           push: true
           tags: ${{ steps.frontend_meta.outputs.tags }}
           labels: ${{ steps.frontend_meta.outputs.labels }}
-
-  deploy-dev-render:
-    name: Deploy Dev Render Preview
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' }}
-    needs:
-      - docker-publish
-    env:
-      BACKEND_IMAGE_REF: ${{ needs.docker-publish.outputs.backend_image_ref }}
-      FRONTEND_IMAGE_REF: ${{ needs.docker-publish.outputs.frontend_image_ref }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Render dev deployment manifest
-        run: |
-          mkdir -p rendered/dev
-          sed "s|image: .*sentinelauth-backend.*|image: ${BACKEND_IMAGE_REF}|" Development/Sprint-3/k8s/deployment.yaml \
-            > rendered/dev/dev-rendered.yaml
-          printf "\n---\n" >> rendered/dev/dev-rendered.yaml
-          cat Development/Sprint-3/k8s/service.yaml >> rendered/dev/dev-rendered.yaml
-          printf "\n---\n" >> rendered/dev/dev-rendered.yaml
-          sed "s|image: .*sentinelauth-frontend.*|image: ${FRONTEND_IMAGE_REF}|" Development/Sprint-4/Front-End/sentinelauth-ui/k8s/deployment.yaml \
-            >> rendered/dev/dev-rendered.yaml
-          printf "\n---\n" >> rendered/dev/dev-rendered.yaml
-          cat Development/Sprint-4/Front-End/sentinelauth-ui/k8s/service.yaml >> rendered/dev/dev-rendered.yaml
-
-      - name: Validate rendered manifest
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workdir" \
-            ghcr.io/yannh/kubeconform:latest \
-            -strict -summary /workdir/rendered/dev/dev-rendered.yaml
-
-      - name: Upload rendered dev manifest
-        uses: actions/upload-artifact@v4
-        with:
-          name: dev-rendered-manifest
-          path: rendered/dev/dev-rendered.yaml
-
-  deploy-dev:
-    name: Deploy Dev Smoke Validation
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' }}
-    needs:
-      - docker-publish
-      - deploy-dev-render
-    environment:
-      name: dev
-    env:
-      BACKEND_IMAGE_REF: ${{ needs.docker-publish.outputs.backend_image_ref }}
-      FRONTEND_IMAGE_REF: ${{ needs.docker-publish.outputs.frontend_image_ref }}
-    permissions:
-      contents: read
-      packages: read
-
-    steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull backend image
-        run: docker pull "$BACKEND_IMAGE_REF"
-
-      - name: Pull frontend image
-        run: docker pull "$FRONTEND_IMAGE_REF"
-
-      - name: Create smoke-test network
-        run: docker network create dev-smoke
-
-      - name: Start backend validation container
-        run: |
-          docker run -d --rm --name alds-dev-backend \
-            --network dev-smoke \
-            --network-alias sentinelauth-backend-service \
-            -p 18000:8000 \
-            "$BACKEND_IMAGE_REF"
-
-      - name: Wait for backend readiness
-        run: |
-          for attempt in {1..20}; do
-            if curl --fail --silent http://127.0.0.1:18000/docs > /dev/null; then
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "Application did not become ready in time" >&2
-          exit 1
-
-      - name: Start frontend validation container
-        run: |
-          docker run -d --rm --name alds-dev-frontend \
-            --network dev-smoke \
-            -p 18080:80 \
-            "$FRONTEND_IMAGE_REF"
-
-      - name: Wait for frontend readiness
-        run: |
-          for attempt in {1..20}; do
-            if curl --fail --silent http://127.0.0.1:18080/ > /dev/null; then
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "Frontend did not become ready in time" >&2
-          exit 1
-
-      - name: Smoke check docs endpoint
-        run: curl --fail http://127.0.0.1:18000/docs
-
-      - name: Smoke check traffic status endpoint
-        run: curl --fail http://127.0.0.1:18000/traffic/status
-
-      - name: Smoke check frontend root
-        run: curl --fail http://127.0.0.1:18080/
-
-      - name: Smoke check frontend API proxy
-        run: curl --fail http://127.0.0.1:18080/api/traffic/status
-
-      - name: Dump container logs on failure
-        if: ${{ failure() }}
-        run: |
-          if docker inspect alds-dev-backend > /dev/null 2>&1; then
-            docker logs alds-dev-backend
-          else
-            echo "Container alds-dev-backend was not created"
-          fi
-          if docker inspect alds-dev-frontend > /dev/null 2>&1; then
-            docker logs alds-dev-frontend
-          else
-            echo "Container alds-dev-frontend was not created"
-          fi
-
-      - name: Stop backend validation container
-        if: ${{ always() }}
-        run: |
-          if docker inspect alds-dev-backend > /dev/null 2>&1; then
-            docker stop alds-dev-backend
-          else
-            echo "Container alds-dev-backend is not running"
-          fi
-
-      - name: Stop frontend validation container
-        if: ${{ always() }}
-        run: |
-          if docker inspect alds-dev-frontend > /dev/null 2>&1; then
-            docker stop alds-dev-frontend
-          else
-            echo "Container alds-dev-frontend is not running"
-          fi
-
-      - name: Remove smoke-test network
-        if: ${{ always() }}
-        run: |
-          if docker network inspect dev-smoke > /dev/null 2>&1; then
-            docker network rm dev-smoke
-          else
-            echo "Network dev-smoke was not created"
-          fi
