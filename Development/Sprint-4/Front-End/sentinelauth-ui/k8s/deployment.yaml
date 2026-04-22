@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentinelauth-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sentinelauth-frontend
+  template:
+    metadata:
+      labels:
+        app: sentinelauth-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: shehrozfaryad/sentinelauth-frontend:v2
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
