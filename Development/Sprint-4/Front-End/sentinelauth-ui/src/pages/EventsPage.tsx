@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import {useCallback, useMemo, useState } from 'react'
 import { api } from '../lib/api'
 import { usePolling } from '../hooks/usePolling'
 import { LogSummaryBar } from '../components/LogSummaryBar'
@@ -34,23 +34,23 @@ export function EventsPage() {
 
   usePolling(refresh, 4000)
 
-  const eventMatchesFilter = (event: LoginEvent) => {
-    if (eventFilter === 'suspicious') {
-      return event.is_suspicious
-    }
-    if (eventFilter === 'high_risk') {
-      return event.risk_score >= 80
-    }
-    if (eventFilter === 'blocked') {
-      return /block|restricted|lock|revoke/i.test(event.event_action)
-    }
-    if (eventFilter === 'failures') {
-      return /failure|invalid|mfa_challenge|required/i.test(event.event_action)
-    }
-    return true
+  const eventMatchesFilter = useCallback((event: LoginEvent) => {
+  if (eventFilter === 'suspicious') {
+    return event.is_suspicious
   }
+  if (eventFilter === 'high_risk') {
+    return event.risk_score >= 80
+  }
+  if (eventFilter === 'blocked') {
+    return /block|restricted|lock|revoke/i.test(event.event_action)
+  }
+  if (eventFilter === 'failures') {
+    return /failure|invalid|mfa_challenge|required/i.test(event.event_action)
+  }
+  return true
+}, [eventFilter])
 
-  const filteredEvents = useMemo(() => events.filter((event) => eventMatchesFilter(event)), [events, eventFilter])
+const filteredEvents = useMemo(() => events.filter(eventMatchesFilter), [events, eventMatchesFilter])
 
   const eventSummary = useMemo(() => {
     const suspicious = filteredEvents.filter((event) => event.is_suspicious).length

@@ -1,0 +1,204 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master", "dev"]
+  pull_request:
+    branches: ["main", "master", "dev"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  BACKEND_IMAGE_REPO: p06-anomalous-login-detection-elk-backend
+  FRONTEND_IMAGE_REPO: p06-anomalous-login-detection-elk-frontend
+
+jobs:
+  python-checks:
+    name: Backend Checks + Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: Development/Sprint-3/requirements.txt
+
+      - name: Install Python dependencies
+        working-directory: Development/Sprint-3
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install coverage pytest
+
+      - name: Syntax check Sprint-3 backend
+        working-directory: Development/Sprint-3
+        run: python -m compileall app
+
+      - name: Syntax check Sprint-4 automation
+        working-directory: Development/Sprint-4
+        run: python -m compileall uc_automation.py test_uc_automation.py
+
+      - name: Run Sprint-4 tests with coverage
+        working-directory: Development/Sprint-4
+        run: |
+          coverage run -m unittest test_uc_automation.py
+          coverage xml -o coverage.xml
+
+      - name: Dependency check
+        working-directory: Development/Sprint-3
+        run: python -m pip check
+
+      - name: SonarCloud Scan
+        if: ${{ env.SONAR_TOKEN != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
+        uses: SonarSource/sonarqube-scan-action@v6
+        with:
+          args: >
+            -Dsonar.python.coverage.reportPaths=Development/Sprint-4/coverage.xml
+        env:
+          SONAR_HOST_URL: https://sonarcloud.io
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  frontend-checks:
+    name: Frontend Lint + Build + Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: Development/Sprint-4/Front-End/sentinelauth-ui
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: Development/Sprint-4/Front-End/sentinelauth-ui/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Run frontend tests
+        run: npm run test:run -- --passWithNoTests
+
+      - name: Build frontend
+        run: npm run build
+
+  docker-build:
+    name: Docker Image Build Validation
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    needs:
+      - python-checks
+      - frontend-checks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Sprint-3 backend image
+        run: |
+          docker build \
+            -f Development/Sprint-3/Dockerfile \
+            -t alds-sprint3-api:${{ github.sha }} \
+            Development/Sprint-3
+
+      - name: Build Sprint-4 frontend image
+        run: |
+          docker build \
+            -f Development/Sprint-4/Front-End/sentinelauth-ui/Dockerfile \
+            -t sentinelauth-frontend:${{ github.sha }} \
+            Development/Sprint-4/Front-End/sentinelauth-ui
+
+  docker-publish:
+    name: Docker Image Publish
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' }}
+    needs:
+      - python-checks
+      - frontend-checks
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute image coordinates
+        id: image
+        run: |
+          owner_lc=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          backend_image_name="ghcr.io/${owner_lc}/${BACKEND_IMAGE_REPO}"
+          frontend_image_name="ghcr.io/${owner_lc}/${FRONTEND_IMAGE_REPO}"
+          echo "backend_name=${backend_image_name}" >> "$GITHUB_OUTPUT"
+          echo "frontend_name=${frontend_image_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract backend Docker metadata
+        id: backend_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.backend_name }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Sprint-3 backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: Development/Sprint-3
+          file: Development/Sprint-3/Dockerfile
+          push: true
+          tags: ${{ steps.backend_meta.outputs.tags }}
+          labels: ${{ steps.backend_meta.outputs.labels }}
+
+      - name: Extract frontend Docker metadata
+        id: frontend_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.frontend_name }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Sprint-4 frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: Development/Sprint-4/Front-End/sentinelauth-ui
+          file: Development/Sprint-4/Front-End/sentinelauth-ui/Dockerfile
+          push: true
+          tags: ${{ steps.frontend_meta.outputs.tags }}
+          labels: ${{ steps.frontend_meta.outputs.labels }}
