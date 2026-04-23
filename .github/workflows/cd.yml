@@ -268,8 +268,8 @@ jobs:
           @'
           {"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"IfNotPresent"}]}}}}
           '@ | Set-Content -Path frontend-patch.json -Encoding utf8
-          kubectl patch deployment sentinelauth-backend --type merge --patch-file backend-patch.json
-          kubectl patch deployment sentinelauth-frontend --type merge --patch-file frontend-patch.json
+          kubectl patch deployment sentinelauth-backend --type strategic --patch-file backend-patch.json
+          kubectl patch deployment sentinelauth-frontend --type strategic --patch-file frontend-patch.json
 
       - name: Restart deployments
         run: |
