@@ -210,3 +210,158 @@ jobs:
           else
             echo "Network dev-smoke was not created"
           fi
+
+  deploy-minikube:
+    name: Deploy To Minikube
+    runs-on: [self-hosted, windows, x64]
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs:
+      - prepare
+      - deploy-dev-render
+      - deploy-dev
+    environment:
+      name: dev
+    env:
+      BACKEND_IMAGE_REF: ${{ needs.prepare.outputs.backend_image_ref }}
+      FRONTEND_IMAGE_REF: ${{ needs.prepare.outputs.frontend_image_ref }}
+    permissions:
+      contents: read
+      packages: read
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull deployment images
+        run: |
+          docker pull $env:BACKEND_IMAGE_REF
+          docker pull $env:FRONTEND_IMAGE_REF
+
+      - name: Load images into Minikube
+        run: |
+          minikube image load $env:BACKEND_IMAGE_REF
+          minikube image load $env:FRONTEND_IMAGE_REF
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f Development/Sprint-3/k8s/deployment.yaml
+          kubectl apply -f Development/Sprint-3/k8s/service.yaml
+          kubectl apply -f Development/Sprint-4/Front-End/sentinelauth-ui/k8s/deployment.yaml
+          kubectl apply -f Development/Sprint-4/Front-End/sentinelauth-ui/k8s/service.yaml
+
+      - name: Pin deployment images to CI artifacts
+        run: |
+          kubectl set image deployment/sentinelauth-backend backend=$env:BACKEND_IMAGE_REF
+          kubectl set image deployment/sentinelauth-frontend frontend=$env:FRONTEND_IMAGE_REF
+
+      - name: Prefer Minikube-loaded images
+        run: |
+          $backendPatch = '{"spec":{"template":{"spec":{"containers":[{"name":"backend","imagePullPolicy":"IfNotPresent"}]}}}}'
+          $frontendPatch = '{"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"IfNotPresent"}]}}}}'
+          kubectl patch deployment sentinelauth-backend --type merge --patch $backendPatch
+          kubectl patch deployment sentinelauth-frontend --type merge --patch $frontendPatch
+
+      - name: Restart deployments
+        run: |
+          kubectl rollout restart deployment/sentinelauth-backend
+          kubectl rollout restart deployment/sentinelauth-frontend
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/sentinelauth-backend --timeout=180s
+          kubectl rollout status deployment/sentinelauth-frontend --timeout=180s
+
+      - name: Verify cluster resources
+        run: |
+          kubectl get deployments
+          kubectl get pods
+          kubectl get services
+
+      - name: Start port-forwards
+        run: |
+          $backend = Start-Process kubectl -ArgumentList 'port-forward','service/sentinelauth-backend-service','18000:8000' -PassThru -WindowStyle Hidden
+          $frontend = Start-Process kubectl -ArgumentList 'port-forward','service/sentinelauth-service','18080:80' -PassThru -WindowStyle Hidden
+          "BACKEND_PF_PID=$($backend.Id)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "FRONTEND_PF_PID=$($frontend.Id)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Start-Sleep -Seconds 5
+
+      - name: Wait for live endpoints
+        run: |
+          $backendReady = $false
+          for ($attempt = 1; $attempt -le 20; $attempt++) {
+            try {
+              Invoke-WebRequest -UseBasicParsing http://127.0.0.1:18000/docs | Out-Null
+              $backendReady = $true
+              break
+            } catch {
+              Start-Sleep -Seconds 3
+            }
+          }
+          if (-not $backendReady) {
+            throw 'Backend endpoint did not become ready in time'
+          }
+
+          $frontendReady = $false
+          for ($attempt = 1; $attempt -le 20; $attempt++) {
+            try {
+              Invoke-WebRequest -UseBasicParsing http://127.0.0.1:18080/ | Out-Null
+              $frontendReady = $true
+              break
+            } catch {
+              Start-Sleep -Seconds 3
+            }
+          }
+          if (-not $frontendReady) {
+            throw 'Frontend endpoint did not become ready in time'
+          }
+
+      - name: Smoke test live backend
+        run: |
+          $docs = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:18000/docs
+          $traffic = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:18000/traffic/status
+          Write-Host "Backend docs status: $($docs.StatusCode)"
+          Write-Host "Backend traffic status: $($traffic.StatusCode)"
+          Write-Host $traffic.Content
+
+      - name: Smoke test live frontend
+        run: |
+          $root = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:18080/
+          $proxy = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:18080/api/traffic/status
+          Write-Host "Frontend root status: $($root.StatusCode)"
+          Write-Host "Frontend proxy status: $($proxy.StatusCode)"
+          Write-Host $proxy.Content
+
+      - name: Dump diagnostics on failure
+        if: ${{ failure() }}
+        run: |
+          kubectl get pods -o wide
+          kubectl describe deployment sentinelauth-backend
+          kubectl describe deployment sentinelauth-frontend
+          kubectl logs deployment/sentinelauth-backend --tail=200
+          kubectl logs deployment/sentinelauth-frontend --tail=200
+
+      - name: Stop backend port-forward
+        if: ${{ always() }}
+        run: |
+          if ($env:BACKEND_PF_PID) {
+            Stop-Process -Id $env:BACKEND_PF_PID -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Stop frontend port-forward
+        if: ${{ always() }}
+        run: |
+          if ($env:FRONTEND_PF_PID) {
+            Stop-Process -Id $env:FRONTEND_PF_PID -Force -ErrorAction SilentlyContinue
+          }
