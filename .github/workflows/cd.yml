@@ -230,7 +230,7 @@ jobs:
       packages: read
     defaults:
       run:
-        shell: pwsh
+        shell: powershell
 
     steps:
       - name: Download rendered manifest
