@@ -262,10 +262,14 @@ jobs:
 
       - name: Prefer Minikube-loaded images
         run: |
-          $backendPatch = '{"spec":{"template":{"spec":{"containers":[{"name":"backend","imagePullPolicy":"IfNotPresent"}]}}}}'
-          $frontendPatch = '{"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"IfNotPresent"}]}}}}'
-          kubectl patch deployment sentinelauth-backend --type merge --patch $backendPatch
-          kubectl patch deployment sentinelauth-frontend --type merge --patch $frontendPatch
+          @'
+          {"spec":{"template":{"spec":{"containers":[{"name":"backend","imagePullPolicy":"IfNotPresent"}]}}}}
+          '@ | Set-Content -Path backend-patch.json -Encoding utf8
+          @'
+          {"spec":{"template":{"spec":{"containers":[{"name":"frontend","imagePullPolicy":"IfNotPresent"}]}}}}
+          '@ | Set-Content -Path frontend-patch.json -Encoding utf8
+          kubectl patch deployment sentinelauth-backend --type merge --patch-file backend-patch.json
+          kubectl patch deployment sentinelauth-frontend --type merge --patch-file frontend-patch.json
 
       - name: Restart deployments
         run: |
